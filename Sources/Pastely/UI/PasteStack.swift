@@ -189,18 +189,18 @@ struct PasteStackView: View {
     private var header: some View {
         HStack(spacing: 10) {
             Image(systemName: "square.stack.3d.up.fill")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(Theme.selection)
             Text("Paste Stack")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(Theme.chromeTextPrimary)
             Text(stack.queue.count == 1 ? "1 item" : "\(stack.queue.count) items")
-                .font(.system(size: 12))
+                .font(.system(size: 12, weight: .light))
                 .foregroundStyle(Theme.chromeTextSecondary)
             Spacer(minLength: 8)
             if stack.needsAccessibility {
                 Label("Allow Accessibility to paste in order", systemImage: "exclamationmark.triangle.fill")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 11, weight: .regular))
                     .foregroundStyle(.orange)
                     .lineLimit(1)
             }
@@ -208,7 +208,7 @@ struct PasteStackView: View {
                 stack.reverse()
             } label: {
                 Image(systemName: "arrow.left.arrow.right")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(stack.queue.reversed ? Theme.selection : Theme.chromeTextSecondary)
                     .frame(width: 26, height: 26)
                     .background(stack.queue.reversed ? Theme.pillSelected : Color.clear, in: Circle())
@@ -220,7 +220,7 @@ struct PasteStackView: View {
                 stack.close()
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Theme.chromeTextSecondary)
                     .frame(width: 26, height: 26)
                     .background(Theme.fieldBG, in: Circle())
@@ -237,10 +237,10 @@ struct PasteStackView: View {
                 .font(.system(size: 26, weight: .light))
                 .foregroundStyle(Theme.chromeTextTertiary)
             Text("Copy items to add them to the stack.")
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 13, weight: .regular))
                 .foregroundStyle(Theme.chromeTextSecondary)
             Text("Each ⌘V then pastes the next one in order.")
-                .font(.system(size: 11.5))
+                .font(.system(size: 11.5, weight: .light))
                 .foregroundStyle(Theme.chromeTextTertiary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -290,12 +290,12 @@ private struct PasteStackCard: View {
                 SourceColor.color(for: item.sourceBundleID)
                 HStack(spacing: 6) {
                     Text("\(position)")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(SourceColor.color(for: item.sourceBundleID))
                         .frame(width: 18, height: 18)
                         .background(.white, in: Circle())
                     Text(ClipKind.of(item).title)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Theme.headerText)
                         .lineLimit(1)
                     Spacer(minLength: 0)
@@ -326,7 +326,7 @@ private struct PasteStackCard: View {
             ZStack {
                 Color(hex: item.colorHex ?? "#000") ?? .black
                 Text((item.colorHex ?? "").uppercased())
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .font(.system(size: 12, weight: .regular, design: .monospaced))
                     .foregroundStyle(.white)
                     .shadow(radius: 1)
             }
@@ -338,14 +338,14 @@ private struct PasteStackCard: View {
             }
         case .file:
             Text(item.displayTitle)
-                .font(.system(size: 11))
+                .font(.system(size: 11, weight: .light))
                 .foregroundStyle(Theme.cardTextSecondary)
                 .lineLimit(4)
                 .multilineTextAlignment(.center)
                 .padding(8)
         default:
             Text(item.text ?? "")
-                .font(.system(size: 11.5))
+                .font(.system(size: 11.5, weight: .light))
                 .foregroundStyle(Theme.cardTextPrimary)
                 .lineLimit(6)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

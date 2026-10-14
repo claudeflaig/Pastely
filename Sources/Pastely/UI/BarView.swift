@@ -86,7 +86,7 @@ struct BarView: View {
             AppController.shared.toggleICloudSync()
         } label: {
             Image(systemName: settings.iCloudSync ? "checkmark.icloud.fill" : "arrow.triangle.2.circlepath")
-                .font(.system(size: 15, weight: .medium))
+                .font(.system(size: 15, weight: .regular))
                 .foregroundStyle(settings.iCloudSync ? Theme.selection : Theme.chromeTextSecondary)
         }
         .buttonStyle(.plain)
@@ -99,7 +99,7 @@ struct BarView: View {
                 AppController.shared.beginBarSearch()
             } label: {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(searchIsActive ? Theme.chromeTextPrimary : Theme.chromeTextSecondary)
             }
             .buttonStyle(.plain)
@@ -132,7 +132,7 @@ struct BarView: View {
                     AppController.shared.clearBarSearch()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12)).foregroundStyle(Theme.chromeTextTertiary)
+                        .font(.system(size: 12, weight: .light)).foregroundStyle(Theme.chromeTextTertiary)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Clear search")
@@ -155,7 +155,7 @@ struct BarView: View {
             AppController.shared.deleteEffectiveSelection()
         } label: {
             Label("Delete \(count)", systemImage: "trash")
-                .font(.system(size: 12.5, weight: .medium))
+                .font(.system(size: 12.5, weight: .regular))
                 .lineLimit(1)
         }
         .buttonStyle(.bordered)
@@ -170,7 +170,7 @@ struct BarView: View {
             store.undoLastDelete()
         } label: {
             Label("Undo", systemImage: "arrow.uturn.backward")
-                .font(.system(size: 12.5, weight: .medium))
+                .font(.system(size: 12.5, weight: .regular))
                 .lineLimit(1)
         }
         .buttonStyle(.bordered)
@@ -197,7 +197,7 @@ struct BarView: View {
             }
         } label: {
             Image(systemName: "ellipsis")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(Theme.chromeTextSecondary)
                 .frame(width: 30, height: 30)
         }
@@ -268,7 +268,7 @@ struct BarView: View {
             Text(store.searchText.isEmpty
                  ? "Nothing copied yet"
                  : "No matches for “\(store.searchText)”")
-                .font(.system(size: 13))
+                .font(.system(size: 13, weight: .light))
                 .foregroundStyle(Theme.chromeTextSecondary)
         }
     }

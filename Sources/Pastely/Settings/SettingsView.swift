@@ -484,7 +484,7 @@ private struct AppearanceSettings: View {
             }
 
             SettingsCard(title: "Folders as Pinboards",
-                         footer: "Each folder gets its own tab listing its newest files, ready to paste or drag.") {
+                         footer: "Each folder gets its own tab listing its newest files, ready to paste or drag. You can also add one with the + next to the tabs.") {
                 ForEach(settings.pinnedFolders, id: \.self) { path in
                     HStack(spacing: 10) {
                         Image(nsImage: NSWorkspace.shared.icon(forFile: path))
@@ -504,7 +504,7 @@ private struct AppearanceSettings: View {
                         .help("Stop showing this folder")
                     }
                 }
-                Button { addFolder() } label: { Label("Add Folder…", systemImage: "plus") }
+                Button { FolderLibrary.shared.chooseAndAdd() } label: { Label("Add Folder…", systemImage: "plus") }
                     .controlSize(.small)
             }
 
@@ -517,18 +517,6 @@ private struct AppearanceSettings: View {
                                isOn: $settings.showCleanShotHistory)
                 #endif
             }
-        }
-    }
-
-    private func addFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = true
-        panel.prompt = "Show as Pinboard"
-        guard panel.runModal() == .OK else { return }
-        for url in panel.urls where !settings.pinnedFolders.contains(url.path) {
-            settings.pinnedFolders.append(url.path)
         }
     }
 

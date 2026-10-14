@@ -158,7 +158,7 @@ enum ClipColorTheme: Int, CaseIterable, Identifiable {
         case .default:
             "Match each clip to its source app\u{2019}s familiar card color."
         case .vibrant:
-            "Use a stronger, higher-contrast version of each source app color."
+            "Give each source app one of Klarglas\u{2019}s bright colors."
         case .accentShades:
             "Give each source app a stable lighter or darker shade of one color."
         }

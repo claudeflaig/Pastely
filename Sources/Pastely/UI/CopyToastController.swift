@@ -69,11 +69,11 @@ private struct CopyToastView: View {
     var body: some View {
         HStack(spacing: 9) {
             Image(systemName: symbol)
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(Theme.selection)
             Text(message)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.primary)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Theme.chromeTextPrimary)
                 .lineLimit(1)
         }
         .padding(.horizontal, 16)

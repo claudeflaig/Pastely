@@ -45,14 +45,19 @@ struct PinboardTabs: View {
                         .contextMenu { menu(for: tab) }
                 }
 
-                Button(action: addPinboard) {
+                Menu {
+                    Button("New Pinboard", action: addPinboard)
+                    Button("Add Folder…", action: addFolder)
+                } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: 15, weight: .regular))
+                        .font(.system(size: 15, weight: .light))
                         .foregroundStyle(Theme.chromeTextSecondary)
                         .frame(width: 26, height: 26)
                 }
-                .buttonStyle(.plain)
-                .help("New Pinboard")
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("New Pinboard or Folder")
             }
         }
     }
@@ -146,6 +151,13 @@ struct PinboardTabs: View {
                 store.deletePinboard(id)
             }
         }
+        if case .folder(let path) = tab {
+            Divider()
+            Button("Remove from Bar") {
+                if store.source == tab { store.source = .history; store.selectFirst() }
+                FolderLibrary.shared.remove(path)
+            }
+        }
     }
 
     /// A tap gesture rather than a Button: a Button tracks the mouse itself and
@@ -155,13 +167,13 @@ struct PinboardTabs: View {
         HStack(spacing: 8) {
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 12, weight: .medium))
             }
             if let dot {
                 Circle().fill(dot).frame(width: 11, height: 11)
             }
             Text(title)
-                .font(.system(size: 14, weight: selected ? .semibold : .regular))
+                .font(.system(size: 14, weight: selected ? .medium : .light))
                 .lineLimit(1)
         }
         .foregroundStyle(selected ? Theme.chromeTextPrimary : Theme.chromeTextSecondary)
@@ -191,6 +203,11 @@ struct PinboardTabs: View {
         }
         image.isTemplate = false
         return image
+    }
+
+    private func addFolder() {
+        guard let path = FolderLibrary.shared.chooseAndAdd() else { return }
+        store.source = .folder(path); store.selectFirst()
     }
 
     private func addPinboard() {

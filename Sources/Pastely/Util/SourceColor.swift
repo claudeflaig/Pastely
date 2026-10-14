@@ -45,7 +45,7 @@ enum SourceColor {
         case .default:
             return palette[paletteIndex(for: bundleID)]
         case .vibrant:
-            return vibrantPalette[paletteIndex(for: bundleID)]
+            return vibrantPalette[paletteIndex(for: bundleID) % vibrantPalette.count]
         case .accentShades:
             return accentShade(
                 for: bundleID?.isEmpty == false ? bundleID! : "unknown",
@@ -71,23 +71,18 @@ enum SourceColor {
         return i
     }
 
-    private static let vibrantPalette: [Color] = palette.map { vibrantColor(from: $0) }
-
-    private static func vibrantColor(from color: Color) -> Color {
-        guard let nsColor = NSColor(color).usingColorSpace(.sRGB) else { return color }
-        var hue: CGFloat = 0
-        var saturation: CGFloat = 0
-        var brightness: CGFloat = 0
-        nsColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: nil)
-
-        // Make the vibrant option visibly distinct while keeping headers dark
-        // enough for their white labels to remain readable.
-        return Color(
-            hue: Double(hue),
-            saturation: min(0.99, max(0.92, Double(saturation) * 1.08)),
-            brightness: min(0.90, max(0.68, Double(brightness) * 0.90))
-        )
-    }
+    // Klarglas's solid colors, in Display P3 as Klarglas draws them.
+    private static let vibrantPalette: [Color] = [
+        (0.065, 0.516, 0.981),  // Blau
+        (0.906, 0.602, 0.097),  // Orange
+        (0.804, 0.274, 0.586),  // Pink
+        (0.385, 0.700, 0.230),  // Grün
+        (0.607, 0.305, 0.984),  // Violett
+        (0.233, 0.767, 0.662),  // Türkis
+        (0.884, 0.184, 0.395),  // Rot
+        (0.722, 0.648, 0.248),  // Beige
+        (0.790, 0.245, 0.199)   // Ziegel
+    ].map { Color(.displayP3, red: $0.0, green: $0.1, blue: $0.2) }
 
     private static func accentShade(for bundleID: String, accentHex: String) -> Color {
         let index = stableIndex(for: bundleID, count: accentVariants.count)

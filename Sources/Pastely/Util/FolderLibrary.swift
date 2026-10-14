@@ -21,6 +21,30 @@ final class FolderLibrary {
 
     func items(in path: String) -> [ClipItem] { contents[path] ?? [] }
 
+    /// Asks for folders and adds each new one as a tab. Returns the first
+    /// folder added, so the bar can switch to it.
+    @discardableResult
+    func chooseAndAdd() -> String? {
+        AppController.shared.suppressAutoHide = true
+        defer { AppController.shared.suppressAutoHide = false }
+        NSApp.activate(ignoringOtherApps: true)
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Show as Pinboard"
+        guard panel.runModal() == .OK else { return nil }
+        let added = panel.urls.map(\.path).filter { !Settings.shared.pinnedFolders.contains($0) }
+        Settings.shared.pinnedFolders.append(contentsOf: added)
+        for path in added { refresh(path) }
+        return added.first
+    }
+
+    func remove(_ path: String) {
+        Settings.shared.pinnedFolders.removeAll { $0 == path }
+        contents[path] = nil
+    }
+
     static func title(for path: String) -> String {
         FileManager.default.displayName(atPath: path)
     }

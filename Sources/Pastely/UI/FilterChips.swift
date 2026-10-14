@@ -27,13 +27,13 @@ struct FilterChips: View {
     private func chip(_ title: String, symbol: String, remove: @escaping () -> Void) -> some View {
         HStack(spacing: 5) {
             Image(systemName: symbol)
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: 10, weight: .medium))
             Text(title)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 12, weight: .regular))
                 .lineLimit(1)
             Button(action: remove) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 8, weight: .bold))
+                    .font(.system(size: 8, weight: .semibold))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Remove \(title) filter")
@@ -88,7 +88,7 @@ struct FilterChips: View {
             Image(systemName: store.filter.isActive
                   ? "line.3.horizontal.decrease.circle.fill"
                   : "line.3.horizontal.decrease.circle")
-                .font(.system(size: 15, weight: .medium))
+                .font(.system(size: 15, weight: .regular))
                 .foregroundStyle(store.filter.isActive ? Theme.selection : Theme.chromeTextSecondary)
         }
         .menuStyle(.borderlessButton)

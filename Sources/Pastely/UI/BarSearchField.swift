@@ -67,10 +67,10 @@ struct NativeBarSearchField: NSViewRepresentable {
         field.usesSingleLineMode = true
         field.lineBreakMode = .byTruncatingTail
         field.placeholderString = "Search"
-        field.font = .systemFont(ofSize: 13, weight: .medium)
+        field.font = .systemFont(ofSize: 13, weight: .regular)
         // Matches Theme.chromeTextPrimary and chromeTextSecondary.
-        field.textColor = .labelColor
-        let placeholderColor = NSColor.secondaryLabelColor
+        field.textColor = Theme.graphiteNS(0.88)
+        let placeholderColor = Theme.graphiteNS(0.55)
         field.placeholderAttributedString = NSAttributedString(
             string: "Search",
             attributes: [.foregroundColor: placeholderColor]

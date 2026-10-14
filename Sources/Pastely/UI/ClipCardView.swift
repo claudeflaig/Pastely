@@ -61,18 +61,18 @@ struct ClipCardView: View {
             headerColor
             VStack(alignment: .leading, spacing: 1) {
                 Text(customTitle ?? cardTypeLabel)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(Theme.headerText)
                 HStack(spacing: 6) {
                     // A renamed card shows its name alone, as Paste does.
                     if customTitle == nil {
                         Text(item.createdAt.clipRelativeLong)
-                            .font(.system(size: 12.5))
+                            .font(.system(size: 12.5, weight: .light))
                             .foregroundStyle(Theme.headerSubText)
                     }
                     if let abbreviation = item.abbreviation {
                         Text(abbreviation)
-                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
                             .foregroundStyle(Theme.headerText)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 1)
@@ -130,7 +130,7 @@ struct ClipCardView: View {
             // Paste floats an image's size on a dark pill over the picture.
             if showsImage {
                 Text(metaLeft)
-                    .font(.system(size: 11.5, weight: .medium))
+                    .font(.system(size: 11.5, weight: .regular))
                     .foregroundStyle(.white.opacity(0.9))
                     .lineLimit(1)
                     .padding(.horizontal, 8)
@@ -170,7 +170,7 @@ struct ClipCardView: View {
             ZStack {
                 Color(hex: item.colorHex ?? "#000") ?? .black
                 Text((item.colorHex ?? "").uppercased())
-                    .font(.system(size: 24, weight: .medium, design: .monospaced))
+                    .font(.system(size: 24, weight: .regular, design: .monospaced))
                     .foregroundStyle(colorCardInk)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -184,7 +184,7 @@ struct ClipCardView: View {
             linkContent
         default:
             Text(item.text ?? "")
-                .font(.system(size: 13.5))
+                .font(.system(size: 13.5, weight: .light))
                 .lineSpacing(2)
                 .foregroundStyle(Theme.cardTextPrimary)
                 .lineLimit(10)
@@ -260,15 +260,15 @@ struct ClipCardView: View {
                     .frame(width: Theme.fileIconSize, height: Theme.fileIconSize)
                     .opacity(fileInfo?.isMissing == true ? 0.5 : 1)
             } else {
-                Image(systemName: "doc.fill").font(.system(size: 32))
+                Image(systemName: "doc.fill").font(.system(size: 32, weight: .light))
                     .foregroundStyle(headerColor)
             }
-            Text(item.displayTitle).font(.system(size: 12))
+            Text(item.displayTitle).font(.system(size: 12, weight: .light))
                 .foregroundStyle(Theme.cardTextSecondary).lineLimit(2)
                 .multilineTextAlignment(.center)
             if fileInfo?.isMissing == true {
                 Text("File not found")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 11, weight: .regular))
                     .foregroundStyle(Theme.cardTextTertiary)
             }
         }
@@ -305,7 +305,7 @@ struct ClipCardView: View {
     }
 
     private func placeholder(_ symbol: String) -> some View {
-        Image(systemName: symbol).font(.system(size: 30))
+        Image(systemName: symbol).font(.system(size: 30, weight: .light))
             .foregroundStyle(Theme.cardTextTertiary)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -324,7 +324,7 @@ struct ClipCardView: View {
                             .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 2 }
                     }
                     Text(linkTitle)
-                        .font(.system(size: 13.5, weight: .semibold))
+                        .font(.system(size: 13.5, weight: .medium))
                         .foregroundStyle(Theme.cardTextPrimary)
                         .lineLimit(2)
                 }
@@ -332,7 +332,7 @@ struct ClipCardView: View {
             // A path is worth reading in full, so it wraps rather than
             // collapsing to an ellipsis; everything else stays one line.
             Text(metaLeft)
-                .font(.system(size: 12))
+                .font(.system(size: 12, weight: .light))
                 .foregroundStyle(Theme.cardTextSecondary)
                 .lineLimit(item.type == .file ? 3 : 1)
                 .multilineTextAlignment(item.type == .link ? .leading : .center)
@@ -343,7 +343,7 @@ struct ClipCardView: View {
             // The quick-paste shortcut stays out of the way until hovered.
             if index < 9, hovering || selected {
                 Text("\(settings.quickPasteModifierDisplay)\(index + 1)")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Theme.cardTextTertiary)
             }
         }

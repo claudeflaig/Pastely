@@ -29,13 +29,13 @@ enum Theme {
     // preserving the ScrollView's normal clipping behavior.
     static let cardStripHorizontalPadding: CGFloat = selectedCardRing + 43
 
-    static let chromeTextPrimary = ink(0.88)
-    static let chromeTextSecondary = ink(0.55)
-    static let chromeTextTertiary = ink(0.32)
+    static let chromeTextPrimary = graphite(0.88)
+    static let chromeTextSecondary = graphite(0.55)
+    static let chromeTextTertiary = graphite(0.32)
 
-    static let cardTextPrimary = ink(0.86)
-    static let cardTextSecondary = ink(0.48)
-    static let cardTextTertiary = ink(0.30)
+    static let cardTextPrimary = graphite(0.86)
+    static let cardTextSecondary = graphite(0.48)
+    static let cardTextTertiary = graphite(0.30)
 
     static let headerText = Color.white
     static let headerSubText = Color.white.opacity(0.85)
@@ -44,10 +44,24 @@ enum Theme {
     static let pillBG = Color.clear
     static let pillSelected = ink(0.08)
 
-    /// Black text on light surfaces, white on dark ones.
+    /// Black washes on light surfaces, white on dark ones, for fills.
     private static func ink(_ opacity: CGFloat) -> Color {
         adaptive(light: NSColor.black.withAlphaComponent(opacity),
                  dark: NSColor.white.withAlphaComponent(opacity))
+    }
+
+    /// Text in warm graphite: a brown-tinted near-black on light surfaces and
+    /// a warm off-white on dark ones, instead of neutral black and white.
+    private static func graphite(_ opacity: CGFloat) -> Color {
+        Color(nsColor: graphiteNS(opacity))
+    }
+
+    static func graphiteNS(_ opacity: CGFloat) -> NSColor {
+        let light = NSColor(srgbRed: 0.18, green: 0.16, blue: 0.14, alpha: 1)
+        let dark = NSColor(srgbRed: 0.98, green: 0.95, blue: 0.91, alpha: 1)
+        return NSColor(name: nil) {
+            (isDark($0) ? dark : light).withAlphaComponent(opacity)
+        }
     }
 
     private static func adaptive(light: NSColor, dark: NSColor) -> Color {

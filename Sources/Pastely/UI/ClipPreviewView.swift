@@ -9,7 +9,7 @@ struct ClipPreviewView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 10) {
                 Image(systemName: item.type.symbol)
-                    .font(.system(size: 19, weight: .semibold))
+                    .font(.system(size: 19, weight: .medium))
                     .foregroundStyle(item.type.accent)
                     .frame(width: 24)
                 VStack(alignment: .leading, spacing: 2) {
@@ -18,7 +18,7 @@ struct ClipPreviewView: View {
                         .lineLimit(2)
                     Text(item.type.label)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.cardTextSecondary)
                 }
                 Spacer()
             }
@@ -62,7 +62,7 @@ struct ClipPreviewView: View {
                     let url = URL(string: value)
                     HStack(alignment: .top, spacing: 9) {
                         Image(systemName: "doc")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.cardTextSecondary)
                         Text(url?.path ?? value)
                             .textSelection(.enabled)
                     }
@@ -71,7 +71,7 @@ struct ClipPreviewView: View {
         case .text, .richText, .link:
             if let text = item.text, !text.isEmpty {
                 Text(text)
-                    .font(.system(size: 14))
+                    .font(.system(size: 14, weight: .light))
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
