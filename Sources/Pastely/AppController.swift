@@ -71,6 +71,10 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 // --demo-stack shows a Paste Stack instead of the bar, and
                 // --demo-filter opens the bar with filter chips applied, so
                 // both can be looked at without driving the keyboard.
+                if CommandLine.arguments.contains(where: { $0.hasPrefix("--demo-settings") }) {
+                    self.showSettings()
+                    return
+                }
                 if CommandLine.arguments.contains("--demo-stack") {
                     PasteStack.shared.open()
                     for item in self.store.history.prefix(4).reversed() { PasteStack.shared.capture(item) }
@@ -187,7 +191,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let menu = NSMenu()
         menu.addItem(withTitle: "Open Pastely   \(Settings.shared.hotkeyDisplay)",
                      action: #selector(menuOpen), keyEquivalent: "").target = self
-        menu.addItem(withTitle: "Paste Stack   ⇧⌘C", action: #selector(menuPasteStack), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Paste Stack   \(Settings.shared.pasteStackHotkeyDisplay)", action: #selector(menuPasteStack), keyEquivalent: "").target = self
         menu.addItem(.separator())
         menu.addItem(withTitle: "Settings…", action: #selector(menuSettings), keyEquivalent: ",").target = self
         let pause = menu.addItem(withTitle: "Pause Pastely", action: #selector(menuTogglePause), keyEquivalent: "")
@@ -573,8 +577,10 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let host = NSHostingController(rootView: view)
         let win = NSWindow(contentViewController: host)
         win.title = "Pastely Settings"
-        win.styleMask = [.titled, .closable, .miniaturizable]
-        win.setContentSize(NSSize(width: 520, height: 560))
+        win.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+        win.titlebarAppearsTransparent = true
+        win.toolbarStyle = .unified
+        win.setContentSize(NSSize(width: 780, height: 600))
         win.center()
         win.isReleasedWhenClosed = false
         settingsWindow = win

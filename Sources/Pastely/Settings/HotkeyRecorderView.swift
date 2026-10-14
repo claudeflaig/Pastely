@@ -2,8 +2,14 @@ import SwiftUI
 import AppKit
 import Carbon.HIToolbox
 
+/// Records a global shortcut into the given key code and Carbon modifiers.
+/// Defaults to the shortcut that shows the bar.
 struct HotkeyRecorderView: View {
-    @Bindable private var settings = Settings.shared
+    @Binding var keyCode: Int
+    @Binding var modifiers: Int
+    /// Another shortcut this one may not duplicate.
+    var reserved: (keyCode: Int, modifiers: Int)?
+
     @State private var recording = false
     @State private var monitor: Any?
 
@@ -11,7 +17,7 @@ struct HotkeyRecorderView: View {
         Button {
             recording ? stop() : start()
         } label: {
-            Text(recording ? "Press keys…" : settings.hotkeyDisplay)
+            Text(recording ? "Press keys…" : HotKeyCenter.describe(keyCode: keyCode, modifiers: modifiers))
                 .font(.system(size: 13, weight: .medium, design: .rounded))
                 .frame(minWidth: 90)
                 .padding(.horizontal, 12).padding(.vertical, 5)
@@ -34,8 +40,11 @@ struct HotkeyRecorderView: View {
             if mods & (cmdKey | controlKey | optionKey) == 0 {
                 NSSound.beep(); return nil
             }
-            settings.hotkeyKeyCode = Int(event.keyCode)
-            settings.hotkeyModifiers = mods
+            if let reserved, reserved.keyCode == Int(event.keyCode), reserved.modifiers == mods {
+                NSSound.beep(); return nil
+            }
+            keyCode = Int(event.keyCode)
+            modifiers = mods
             stop()
             return nil
         }

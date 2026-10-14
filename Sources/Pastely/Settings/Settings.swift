@@ -265,6 +265,8 @@ final class Settings {
         static let showCleanShotHistory = "showCleanShotHistory"
         static let hideWhileScreenSharing = "hideWhileScreenSharing"
         static let pasteStackShortcut = "pasteStackShortcut"
+        static let pasteStackKeyCode = "pasteStackKeyCode"
+        static let pasteStackModifiers = "pasteStackModifiers"
     }
 
     var historyLimit: Int {
@@ -443,6 +445,26 @@ final class Settings {
         }
     }
 
+    var pasteStackKeyCode: Int {
+        didSet {
+            guard isLoaded else { return }
+            d.set(pasteStackKeyCode, forKey: Keys.pasteStackKeyCode)
+            HotKeyCenter.shared.reloadStackHotKey()
+        }
+    }
+
+    var pasteStackModifiers: Int {
+        didSet {
+            guard isLoaded else { return }
+            d.set(pasteStackModifiers, forKey: Keys.pasteStackModifiers)
+            HotKeyCenter.shared.reloadStackHotKey()
+        }
+    }
+
+    var pasteStackHotkeyDisplay: String {
+        HotKeyCenter.describe(keyCode: pasteStackKeyCode, modifiers: pasteStackModifiers)
+    }
+
     private init() {
         d.register(defaults: [
             Keys.historyLimit: 500,
@@ -477,7 +499,9 @@ final class Settings {
             Keys.linkPreviews: true,
             Keys.showCleanShotHistory: true,
             Keys.hideWhileScreenSharing: false,
-            Keys.pasteStackShortcut: true
+            Keys.pasteStackShortcut: true,
+            Keys.pasteStackKeyCode: kVK_ANSI_C,
+            Keys.pasteStackModifiers: cmdKey | shiftKey
         ])
         historyLimit = d.integer(forKey: Keys.historyLimit)
         historyRetentionMode = HistoryRetentionMode(rawValue: d.string(forKey: Keys.historyRetentionMode) ?? "")
@@ -514,6 +538,8 @@ final class Settings {
         showCleanShotHistory = d.bool(forKey: Keys.showCleanShotHistory)
         hideWhileScreenSharing = d.bool(forKey: Keys.hideWhileScreenSharing)
         pasteStackShortcut = d.bool(forKey: Keys.pasteStackShortcut)
+        pasteStackKeyCode = d.integer(forKey: Keys.pasteStackKeyCode)
+        pasteStackModifiers = d.integer(forKey: Keys.pasteStackModifiers)
         isLoaded = true
         if normalizedBarHeight != storedBarHeight {
             d.set(normalizedBarHeight, forKey: Keys.barHeight)

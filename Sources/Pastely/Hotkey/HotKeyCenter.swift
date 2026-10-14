@@ -6,7 +6,7 @@ final class HotKeyCenter {
     static let shared = HotKeyCenter()
 
     var onTrigger: (() -> Void)?
-    /// Fired by the fixed Paste Stack shortcut, ⇧⌘C as in Paste.
+    /// Fired by the Paste Stack shortcut, ⇧⌘C by default as in Paste.
     var onStackTrigger: (() -> Void)?
 
     private static let barHotKeyID: UInt32 = 1
@@ -26,13 +26,15 @@ final class HotKeyCenter {
     }
 
     /// ⇧⌘C is also taken by some apps (Finder's Computer, browser inspectors),
-    /// so the Paste Stack shortcut can be turned off in Settings.
+    /// so the Paste Stack shortcut can be changed or turned off in Settings.
     func reloadStackHotKey() {
         if let ref = stackHotKeyRef { UnregisterEventHotKey(ref); stackHotKeyRef = nil }
         guard Settings.shared.pasteStackShortcut else { return }
         let id = EventHotKeyID(signature: signature, id: Self.stackHotKeyID)
         var ref: EventHotKeyRef?
-        if RegisterEventHotKey(UInt32(kVK_ANSI_C), UInt32(cmdKey | shiftKey), id,
+        let keyCode = Settings.shared.pasteStackKeyCode
+        guard keyCode != 0 else { return }
+        if RegisterEventHotKey(UInt32(keyCode), UInt32(Settings.shared.pasteStackModifiers), id,
                                GetApplicationEventTarget(), 0, &ref) == noErr {
             stackHotKeyRef = ref
         }

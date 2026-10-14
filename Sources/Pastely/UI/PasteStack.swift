@@ -226,7 +226,7 @@ struct PasteStackView: View {
                     .background(Theme.fieldBG, in: Circle())
             }
             .buttonStyle(.plain)
-            .help("Close Paste Stack (⇧⌘C)")
+            .help("Close Paste Stack (\(Settings.shared.pasteStackHotkeyDisplay))")
             .accessibilityLabel("Close Paste Stack")
         }
     }

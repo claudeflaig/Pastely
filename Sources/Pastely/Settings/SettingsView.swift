@@ -1,17 +1,641 @@
 import SwiftUI
 import AppKit
 
-struct SettingsView: View {
-    var body: some View {
-        TabView {
-            GeneralSettings()
-                .tabItem { Label("General", systemImage: "gearshape") }
-            PrivacySettings()
-                .tabItem { Label("Privacy", systemImage: "hand.raised") }
-            AboutView()
-                .tabItem { Label("About", systemImage: "info.circle") }
+/// The sections of the Settings window, listed in its sidebar the way System
+/// Settings lists its panes: a colored icon tile and a name.
+enum SettingsPane: String, CaseIterable, Identifiable {
+    case general, appearance, shortcuts, pasteStack, history, privacy, sync, about
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .general: "General"
+        case .appearance: "Appearance"
+        case .shortcuts: "Shortcuts"
+        case .pasteStack: "Paste Stack"
+        case .history: "History"
+        case .privacy: "Privacy"
+        case .sync: "Sync"
+        case .about: "About"
         }
-        .frame(width: 520, height: 560)
+    }
+
+    var subtitle: String {
+        switch self {
+        case .general: "How Pastely starts and behaves when you paste."
+        case .appearance: "Theme, position and what the cards show."
+        case .shortcuts: "Keyboard shortcuts for the bar and quick paste."
+        case .pasteStack: "Collect several copies, then paste them in order."
+        case .history: "How long clips are kept, and the data on this Mac."
+        case .privacy: "Apps and content Pastely never records."
+        case .sync: "Keep history and pinboards in step across your Macs."
+        case .about: "Version, source code and credits."
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .general: "gearshape.fill"
+        case .appearance: "paintbrush.fill"
+        case .shortcuts: "keyboard.fill"
+        case .pasteStack: "square.stack.3d.up.fill"
+        case .history: "clock.fill"
+        case .privacy: "hand.raised.fill"
+        case .sync: "icloud.fill"
+        case .about: "info.circle.fill"
+        }
+    }
+
+    /// `--demo-settings=<pane>` opens Settings on that pane, so each one can
+    /// be looked at without clicking through.
+    static var initial: SettingsPane {
+        let arg = CommandLine.arguments.first { $0.hasPrefix("--demo-settings=") }
+        return arg.flatMap { SettingsPane(rawValue: String($0.dropFirst("--demo-settings=".count))) } ?? .general
+    }
+
+    var tint: Color {
+        switch self {
+        case .general: .gray
+        case .appearance: .pink
+        case .shortcuts: .indigo
+        case .pasteStack: .blue
+        case .history: .orange
+        case .privacy: .green
+        case .sync: .cyan
+        case .about: .purple
+        }
+    }
+}
+
+struct SettingsView: View {
+    @State private var pane: SettingsPane = SettingsPane.initial
+
+
+
+    var body: some View {
+        NavigationSplitView {
+            List(SettingsPane.allCases, selection: $pane) { pane in
+                Label {
+                    Text(pane.title)
+                } icon: {
+                    SettingsIcon(symbol: pane.symbol, tint: pane.tint, size: 22)
+                }
+                .tag(pane)
+            }
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 190, ideal: 200, max: 220)
+        } detail: {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    SettingsHeader(pane: pane)
+                    paneContent
+                }
+                .padding(.horizontal, 28)
+                .padding(.vertical, 22)
+                .frame(maxWidth: 560, alignment: .leading)
+                .frame(maxWidth: .infinity)
+            }
+            .navigationTitle(pane.title)
+        }
+        .frame(minWidth: 760, minHeight: 560)
+    }
+
+    @ViewBuilder
+    private var paneContent: some View {
+        switch pane {
+        case .general: GeneralSettings()
+        case .appearance: AppearanceSettings()
+        case .shortcuts: ShortcutSettings()
+        case .pasteStack: PasteStackSettings()
+        case .history: HistorySettings()
+        case .privacy: PrivacySettings()
+        case .sync: SyncSettings()
+        case .about: AboutView()
+        }
+    }
+}
+
+// MARK: - Building blocks
+
+/// A white SF Symbol on a rounded, gradient-filled tile, as in System Settings.
+struct SettingsIcon: View {
+    let symbol: String
+    let tint: Color
+    var size: CGFloat = 22
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: size * 0.27, style: .continuous)
+            .fill(tint.gradient)
+            .frame(width: size, height: size)
+            .overlay(
+                Image(systemName: symbol)
+                    .font(.system(size: size * 0.52, weight: .semibold))
+                    .foregroundStyle(.white)
+            )
+    }
+}
+
+private struct SettingsHeader: View {
+    let pane: SettingsPane
+
+    var body: some View {
+        HStack(spacing: 14) {
+            SettingsIcon(symbol: pane.symbol, tint: pane.tint, size: 44)
+                .shadow(color: pane.tint.opacity(0.35), radius: 6, y: 3)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(pane.title)
+                    .font(.system(size: 22, weight: .bold))
+                Text(pane.subtitle)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.bottom, 4)
+    }
+}
+
+/// A rounded card holding rows, separated by hairlines.
+struct SettingsCard<Content: View>: View {
+    var title: String?
+    var footer: String?
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let title {
+                Text(title.uppercased())
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 4)
+            }
+            rows
+            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.08))
+            )
+            if let footer {
+                Text(footer)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 4)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
+extension SettingsCard {
+    /// Hairlines between rows where the OS can enumerate a view's children;
+    /// macOS 14 stacks the rows with spacing instead.
+    @ViewBuilder
+    fileprivate var rows: some View {
+        let stack = VStack(alignment: .leading, spacing: 0) {
+            if #available(macOS 15.0, *) {
+                Group(subviews: content) { rows in
+                    ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
+                        if index > 0 { Divider().padding(.leading, 14) }
+                        row
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 14) { content }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        stack
+    }
+}
+
+/// A row with a title, an optional explanation and a trailing control.
+struct SettingsRow<Accessory: View>: View {
+    let title: String
+    var detail: String?
+    @ViewBuilder var accessory: Accessory
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.system(size: 13))
+                if let detail {
+                    Text(detail)
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 12)
+            accessory
+        }
+    }
+}
+
+struct SettingsToggle: View {
+    let title: String
+    var detail: String?
+    @Binding var isOn: Bool
+
+    var body: some View {
+        SettingsRow(title: title, detail: detail) {
+            Toggle("", isOn: $isOn).labelsHidden().toggleStyle(.switch).controlSize(.small)
+        }
+    }
+}
+
+/// A picture-led choice, like the appearance tiles in System Settings.
+private struct ChoiceTile<Preview: View>: View {
+    let title: String
+    let selected: Bool
+    let action: () -> Void
+    @ViewBuilder var preview: Preview
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 7) {
+                preview
+                    .frame(width: 118, height: 74)
+                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .strokeBorder(selected ? Color.accentColor : Color.primary.opacity(0.12),
+                                          lineWidth: selected ? 3 : 1)
+                    )
+                Text(title)
+                    .font(.system(size: 12, weight: selected ? .semibold : .regular))
+                    .foregroundStyle(selected ? .primary : .secondary)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// A miniature desktop with the card bar on it, for the theme and position
+/// tiles.
+private struct BarMiniature: View {
+    var dark: Bool
+    var split = false
+    var top = false
+
+    private let cardColors: [Color] = [.yellow, .blue, .pink, .green]
+
+    var body: some View {
+        ZStack(alignment: top ? .top : .bottom) {
+            LinearGradient(colors: [Color(red: 0.36, green: 0.55, blue: 0.95), Color(red: 0.62, green: 0.42, blue: 0.9)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+            HStack(spacing: 0) {
+                bar(dark: split ? false : dark)
+                if split { bar(dark: true) }
+            }
+            .frame(height: 30)
+        }
+    }
+
+    private func bar(dark: Bool) -> some View {
+        HStack(spacing: 4) {
+            ForEach(cardColors.indices, id: \.self) { i in
+                VStack(spacing: 0) {
+                    cardColors[i].frame(height: 5)
+                    (dark ? Color(white: 0.2) : .white)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 2))
+                .frame(width: 18, height: 20)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(dark ? Color.black.opacity(0.55) : Color.white.opacity(0.6))
+    }
+}
+
+// MARK: - Panes
+
+private struct GeneralSettings: View {
+    @Bindable private var settings = Settings.shared
+    #if !MAS
+    @State private var accessibilityGranted = AXIsProcessTrusted()
+    @State private var requestedGrant = false
+
+    private let poll = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    #endif
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            #if !MAS
+            SettingsCard(title: "Permissions") {
+                HStack(spacing: 12) {
+                    Image(systemName: accessibilityGranted ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
+                        .foregroundStyle(accessibilityGranted ? .green : .orange)
+                        .font(.system(size: 20))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Accessibility").font(.system(size: 13, weight: .medium))
+                        Text(accessibilityGranted
+                             ? "Granted. Pastely can paste directly and advance the Paste Stack."
+                             : (requestedGrant
+                                ? "Waiting… switch Pastely on in System Settings."
+                                : "Needed to paste directly into other apps and for the Paste Stack."))
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if !accessibilityGranted {
+                        Button("Open Settings") {
+                            requestedGrant = true
+                            PasteService.ensureAccessibility(prompt: true)
+                            openAccessibilityPane()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                    } else if requestedGrant {
+                        Button("Restart Pastely") { AppController.restart() }
+                            .controlSize(.small)
+                    }
+                }
+            }
+            #endif
+
+            SettingsCard(title: "Startup") {
+                SettingsToggle(title: "Launch at login", isOn: $settings.launchAtLogin)
+                SettingsToggle(title: "Show Pastely in the menu bar", isOn: $settings.showMenuBarIcon)
+            }
+
+            SettingsCard(title: "Pasting") {
+                #if !MAS
+                SettingsToggle(title: "Paste directly into the active app",
+                               detail: "Otherwise the clip is copied and you press ⌘V yourself.",
+                               isOn: $settings.pasteDirectly)
+                #endif
+                SettingsToggle(title: "Move pasted clips to the front", isOn: $settings.promoteOnPaste)
+                SettingsToggle(title: "Hide the bar when clicking outside", isOn: $settings.hideOnClickOutside)
+                SettingsToggle(title: "Play a sound when pasting", isOn: $settings.playSound)
+                SettingsToggle(title: "Play a sound when copying from Pastely", isOn: $settings.playSoundOnCopy)
+                #if MAS
+                Text("Select a clip to copy it, then press ⌘V to paste it into your app.")
+                    .font(.system(size: 11.5)).foregroundStyle(.secondary)
+                #endif
+            }
+        }
+        #if !MAS
+        .onAppear { accessibilityGranted = AXIsProcessTrusted() }
+        .onReceive(poll) { _ in
+            let now = AXIsProcessTrusted()
+            if now != accessibilityGranted { accessibilityGranted = now }
+        }
+        #endif
+    }
+
+    #if !MAS
+    private func openAccessibilityPane() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+    #endif
+}
+
+private struct AppearanceSettings: View {
+    @Bindable private var settings = Settings.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            SettingsCard(title: "Theme") {
+                HStack(spacing: 14) {
+                    ForEach(BarAppearance.allCases) { appearance in
+                        ChoiceTile(title: appearance.title, selected: settings.barAppearance == appearance) {
+                            settings.barAppearance = appearance
+                        } preview: {
+                            BarMiniature(dark: appearance == .dark, split: appearance == .system)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+
+            SettingsCard(title: "Position") {
+                HStack(spacing: 14) {
+                    ForEach(BarEdge.allCases) { edge in
+                        ChoiceTile(title: edge.title, selected: settings.barEdge == edge) {
+                            settings.barEdge = edge
+                        } preview: {
+                            BarMiniature(dark: false, top: edge == .top)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Bar height").font(.system(size: 13))
+                        Spacer()
+                        Text("\(Int(settings.barHeight)) pt")
+                            .font(.system(size: 12, weight: .medium).monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                    // Rounded in the binding rather than with `step`, which
+                    // would draw a tick mark for every 10 pt.
+                    Slider(value: Binding(
+                        get: { settings.barHeight },
+                        set: { settings.barHeight = ($0 / 10).rounded() * 10 }
+                    ), in: 300...720)
+                }
+                SettingsToggle(title: "Show a resize handle on the bar", isOn: $settings.showBarResizeHandle)
+                SettingsRow(title: "Selected card", detail: settings.selectedClipPosition.detail) {
+                    Picker("", selection: $settings.selectedClipPosition) {
+                        ForEach(SelectedClipPosition.allCases) { position in
+                            Text(position.title).tag(position)
+                        }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
+            }
+
+            SettingsCard(title: "Card Colors", footer: settings.clipColorTheme.detail) {
+                Picker("", selection: $settings.clipColorTheme) {
+                    ForEach(ClipColorTheme.allCases) { theme in
+                        Text(theme.title).tag(theme)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                if settings.clipColorTheme == .accentShades {
+                    SettingsRow(title: "Base color") {
+                        HStack(spacing: 4) {
+                            ForEach(Array(SourceColor.accentShades(for: settings.clipColorAccentHex).enumerated()),
+                                    id: \.offset) { _, color in
+                                Circle().fill(color).frame(width: 12, height: 12)
+                            }
+                            .accessibilityLabel("Ten stable shades of the selected base color")
+                            ColorPicker("", selection: clipColorAccent, supportsOpacity: false)
+                                .labelsHidden()
+                        }
+                    }
+                }
+            }
+
+            SettingsCard(title: "Content",
+                         footer: "Link previews load the page's title and image from the site the first time a link is shown.") {
+                SettingsToggle(title: "Show link previews", isOn: $settings.linkPreviews)
+                #if !MAS
+                SettingsToggle(title: "Show CleanShot X history as a pinboard",
+                               detail: "Your captures appear in their own tab, newest first.",
+                               isOn: $settings.showCleanShotHistory)
+                #endif
+            }
+        }
+    }
+
+    private var clipColorAccent: Binding<Color> {
+        Binding(
+            get: { Color(hex: settings.clipColorAccentHex) ?? .pink },
+            set: { settings.clipColorAccentHex = NSColor($0).hexString }
+        )
+    }
+}
+
+private struct ShortcutSettings: View {
+    @Bindable private var settings = Settings.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            SettingsCard(title: "Global Shortcuts", footer: "Click a shortcut, then press the new key combination.") {
+                SettingsRow(title: "Show Pastely") {
+                    HotkeyRecorderView(keyCode: $settings.hotkeyKeyCode,
+                                       modifiers: $settings.hotkeyModifiers,
+                                       reserved: (settings.pasteStackKeyCode, settings.pasteStackModifiers))
+                }
+                SettingsRow(title: "Open or close the Paste Stack") {
+                    HotkeyRecorderView(keyCode: $settings.pasteStackKeyCode,
+                                       modifiers: $settings.pasteStackModifiers,
+                                       reserved: (settings.hotkeyKeyCode, settings.hotkeyModifiers))
+                        .disabled(!settings.pasteStackShortcut)
+                        .opacity(settings.pasteStackShortcut ? 1 : 0.5)
+                }
+            }
+
+            SettingsCard(title: "Quick Paste",
+                         footer: "Hold the plain-text modifier as well to strip formatting; with the defaults, ⌘⇧1 pastes the first clip as plain text. The two can never share a modifier; picking one that is taken swaps them.") {
+                SettingsRow(title: "Paste items 1–9") {
+                    HStack(spacing: 6) {
+                        modifierPicker(selection: $settings.quickPasteModifier)
+                        Text("+ 1…9").foregroundStyle(.secondary)
+                    }
+                }
+                SettingsRow(title: "Paste as plain text") {
+                    modifierPicker(selection: $settings.plainTextModifier)
+                }
+            }
+        }
+    }
+
+    private func modifierPicker(selection: Binding<Int>) -> some View {
+        Picker("", selection: selection) {
+            ForEach(ShortcutModifier.allCases) { modifier in
+                Text("\(modifier.symbol) \(modifier.title)").tag(modifier.carbonValue)
+            }
+        }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .fixedSize()
+    }
+}
+
+private struct PasteStackSettings: View {
+    @Bindable private var settings = Settings.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            SettingsCard(title: "How it works") {
+                stepRow(1, "Press \(settings.pasteStackHotkeyDisplay) to open a stack.")
+                stepRow(2, "Copy everything you need, in order. Copying an item again moves it to the end.")
+                stepRow(3, "Each ⌘V pastes the next item. The arrows in the stack reverse the order.")
+                stepRow(4, "Press \(settings.pasteStackHotkeyDisplay) again, or click ✕, to close it.")
+            }
+            SettingsCard(footer: "Pasting in order needs the Accessibility permission, so Pastely can notice each ⌘V. Some apps use ⇧⌘C themselves; change the shortcut under Shortcuts.") {
+                SettingsToggle(title: "Enable the Paste Stack shortcut", isOn: $settings.pasteStackShortcut)
+                SettingsRow(title: "Shortcut") {
+                    HotkeyRecorderView(keyCode: $settings.pasteStackKeyCode,
+                                       modifiers: $settings.pasteStackModifiers,
+                                       reserved: (settings.hotkeyKeyCode, settings.hotkeyModifiers))
+                        .disabled(!settings.pasteStackShortcut)
+                        .opacity(settings.pasteStackShortcut ? 1 : 0.5)
+                }
+                SettingsRow(title: "Open a stack now") {
+                    Button(PasteStack.shared.isActive ? "Close Stack" : "Open Stack") { PasteStack.shared.toggle() }
+                        .controlSize(.small)
+                }
+            }
+        }
+    }
+
+    private func stepRow(_ number: Int, _ text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text("\(number)")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 20, height: 20)
+                .background(Color.blue.gradient, in: Circle())
+            Text(text).font(.system(size: 13))
+        }
+    }
+}
+
+private struct HistorySettings: View {
+    @Bindable private var settings = Settings.shared
+    @State private var confirmingClear = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Form { HistoryRetentionSettings() }
+                .formStyle(.grouped)
+                .scrollDisabled(true)
+                .frame(minHeight: settings.historyRetentionMode == .itemCount ? 190 : 260)
+                .padding(.horizontal, -20)
+                .padding(.vertical, -10)
+
+            SettingsCard(title: "Deleting") {
+                SettingsToggle(title: "Delete permanently",
+                               detail: "Skips the five-minute Undo window. Hold Option while deleting to skip it once.",
+                               isOn: $settings.deletePermanently)
+                SettingsRow(title: "Clear clipboard history", detail: "Pinboards are kept.") {
+                    Button("Clear…", role: .destructive) { confirmingClear = true }
+                        .controlSize(.small)
+                }
+            }
+        }
+        .alert("Clear Clipboard History?", isPresented: $confirmingClear) {
+            Button("Clear History", role: .destructive) { ClipboardStore.shared.clearHistory() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Every clip in history is removed. Pinboards are not affected.")
+        }
+    }
+}
+
+private struct SyncSettings: View {
+    @Bindable private var settings = Settings.shared
+
+    var body: some View {
+        #if MAS
+        SettingsCard(footer: CloudSyncService.shared.status) {
+            SettingsToggle(title: "Sync history with iCloud", isOn: Binding(
+                get: { settings.cloudKitSync },
+                set: { on in
+                    settings.cloudKitSync = on
+                    if on { CloudSyncService.shared.enable() } else { CloudSyncService.shared.stop() }
+                }))
+        }
+        #else
+        SettingsCard(footer: ClipboardStore.shared.iCloudAvailable
+                     ? "Keeps your history and pinboards in sync across your Macs through iCloud Drive."
+                     : "Sign in to iCloud and turn on iCloud Drive to use sync.") {
+            SettingsToggle(title: "Sync through iCloud Drive", isOn: Binding(
+                get: { settings.iCloudSync },
+                set: { _ in AppController.shared.toggleICloudSync() }))
+        }
+        #endif
     }
 }
 
@@ -19,29 +643,35 @@ private struct PrivacySettings: View {
     @Bindable private var settings = Settings.shared
 
     var body: some View {
-        Form {
-            Section("Excluded Apps") {
-                Text("Pastely will not save anything copied while one of these apps is frontmost. Copies made from a browser extension are attributed to the browser, so add that too if you use one.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 20) {
+            SettingsCard(title: "Sensitive Content") {
+                SettingsToggle(title: "Ignore passwords",
+                               detail: "Skips content that password managers mark as concealed.",
+                               isOn: $settings.ignoreConcealed)
+                SettingsToggle(title: "Hide from screen sharing and recordings",
+                               detail: "The bar and the Paste Stack stay invisible to others.",
+                               isOn: $settings.hideWhileScreenSharing)
+            }
 
+            SettingsCard(title: "Excluded Apps",
+                         footer: "Nothing copied while one of these apps is frontmost is saved. Copies from a browser extension count as the browser's, so add the browser too if you use one.") {
                 if settings.ignoredSourceAppBundleIDs.isEmpty {
-                    ContentUnavailableView("No apps excluded",
-                                           systemImage: "hand.raised",
-                                           description: Text("Add an app to keep its copied content out of Pastely."))
-                        .padding(.vertical, 12)
+                    HStack {
+                        Image(systemName: "hand.raised").foregroundStyle(.secondary)
+                        Text("No apps excluded").foregroundStyle(.secondary)
+                    }
+                    .font(.system(size: 13))
                 } else {
                     ForEach(settings.ignoredSourceAppBundleIDs, id: \.self) { bundleID in
                         ignoredAppRow(bundleID)
                     }
                 }
-
                 Button { chooseApps() } label: {
                     Label("Add App…", systemImage: "plus")
                 }
+                .controlSize(.small)
             }
         }
-        .formStyle(.grouped)
     }
 
     private func ignoredAppRow(_ bundleID: String) -> some View {
@@ -92,233 +722,6 @@ private struct PrivacySettings: View {
         return (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
             ?? (bundle.object(forInfoDictionaryKey: "CFBundleName") as? String)
             ?? bundleID
-    }
-}
-
-private struct GeneralSettings: View {
-    @Bindable private var settings = Settings.shared
-    #if !MAS
-    @State private var accessibilityGranted = AXIsProcessTrusted()
-    @State private var requestedGrant = false
-
-    private let poll = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    #endif
-
-    var body: some View {
-        Form {
-            Section("Activation") {
-                LabeledContent("Show Pastely") { HotkeyRecorderView() }
-            }
-
-            HistoryRetentionSettings()
-
-            Section("Quick Paste") {
-                LabeledContent("Paste items 1–9") {
-                    HStack(spacing: 6) {
-                        modifierPicker(selection: $settings.quickPasteModifier)
-                        Text("+ 1…9").foregroundStyle(.secondary)
-                    }
-                }
-                LabeledContent("Paste as plain text") {
-                    modifierPicker(selection: $settings.plainTextModifier)
-                }
-                Text("Hold the plain-text modifier while using Quick Paste to strip formatting — with the defaults, ⌘⇧1 pastes the first clip as plain text. The two roles can never share a modifier; picking one that is taken swaps them.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Paste Stack") {
-                Toggle("Start a Paste Stack with ⇧⌘C", isOn: $settings.pasteStackShortcut)
-                Text("While a stack is open, everything you copy joins it, and each ⌘V pastes the next item in order. Pasting in sequence needs the Accessibility permission. Press ⇧⌘C again to close the stack.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Behavior") {
-                #if !MAS
-                Toggle("Paste directly into the active app", isOn: $settings.pasteDirectly)
-                #endif
-                Toggle("Ignore passwords (concealed clips)", isOn: $settings.ignoreConcealed)
-                Toggle("Promote pasted clips to the top of history", isOn: $settings.promoteOnPaste)
-                Toggle("Play sound on paste", isOn: $settings.playSound)
-                Toggle("Play sound when copying from Pastely", isOn: $settings.playSoundOnCopy)
-                Toggle("Hide Pastely when clicking outside", isOn: $settings.hideOnClickOutside)
-                Toggle("Launch at login", isOn: $settings.launchAtLogin)
-                Toggle("Show Pastely in the menu bar", isOn: $settings.showMenuBarIcon)
-                VStack(alignment: .leading) {
-                    LabeledContent("Bar height", value: "\(Int(settings.barHeight)) pt")
-                    Slider(value: $settings.barHeight, in: 300...720, step: 10)
-                }
-                Toggle("Show resize handle on the Paste Bar", isOn: $settings.showBarResizeHandle)
-                #if MAS
-                Text("Select a clip to copy it, then press ⌘V to paste it into your app.")
-                    .font(.caption).foregroundStyle(.secondary)
-                #endif
-            }
-
-            Section("Appearance") {
-                Picker("Theme", selection: $settings.barAppearance) {
-                    ForEach(BarAppearance.allCases) { appearance in
-                        Text(appearance.title).tag(appearance)
-                    }
-                }
-                .pickerStyle(.segmented)
-                Picker("Show the bar at the", selection: $settings.barEdge) {
-                    ForEach(BarEdge.allCases) { edge in
-                        Text(edge.title).tag(edge)
-                    }
-                }
-                .pickerStyle(.segmented)
-                Toggle("Show link previews", isOn: $settings.linkPreviews)
-                #if !MAS
-                Toggle("Show CleanShot X history as a pinboard", isOn: $settings.showCleanShotHistory)
-                #endif
-                Toggle("Hide the bar from screen sharing and recordings", isOn: $settings.hideWhileScreenSharing)
-                Text("Link previews load the page's title and image from the site when a link is first shown.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Clip Colors") {
-                Picker("Color theme", selection: $settings.clipColorTheme) {
-                    ForEach(ClipColorTheme.allCases) { theme in
-                        Text(theme.title).tag(theme)
-                    }
-                }
-                .pickerStyle(.segmented)
-                Text(settings.clipColorTheme.detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if settings.clipColorTheme == .accentShades {
-                    ColorPicker("Base color", selection: clipColorAccent, supportsOpacity: false)
-                    HStack(spacing: 12) {
-                        Text("Preview")
-                            .foregroundStyle(.secondary)
-                        HStack(spacing: 4) {
-                            ForEach(Array(SourceColor.accentShades(for: settings.clipColorAccentHex).enumerated()),
-                                    id: \.offset) { _, color in
-                                Circle()
-                                    .fill(color)
-                                    .frame(width: 13, height: 13)
-                            }
-                        }
-                        .accessibilityLabel("Ten stable shades of the selected base color")
-                    }
-                    Text("Each source app keeps one of ten deterministic shades, so its cards stay recognizable without drifting too far from your chosen color.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Section("Clip Navigation") {
-                Picker("Selected clip position", selection: $settings.selectedClipPosition) {
-                    ForEach(SelectedClipPosition.allCases) { position in
-                        Text(position.title).tag(position)
-                    }
-                }
-                .pickerStyle(.segmented)
-                Text(settings.selectedClipPosition.detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            #if MAS
-            Section("Sync") {
-                Toggle("Sync history with iCloud", isOn: Binding(
-                    get: { settings.cloudKitSync },
-                    set: { on in
-                        settings.cloudKitSync = on
-                        if on { CloudSyncService.shared.enable() } else { CloudSyncService.shared.stop() }
-                    }))
-                Text(CloudSyncService.shared.status)
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            #else
-            Section("Sync") {
-                Toggle("Sync clipboard via iCloud Drive", isOn: Binding(
-                    get: { settings.iCloudSync },
-                    set: { _ in AppController.shared.toggleICloudSync() }))
-                Text(ClipboardStore.shared.iCloudAvailable
-                     ? "Keeps your history and pinboards in sync across your Macs through iCloud Drive."
-                     : "Sign in to iCloud and enable iCloud Drive to use sync.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            #endif
-
-            #if !MAS
-            Section("Permissions") {
-                HStack(spacing: 10) {
-                    Image(systemName: accessibilityGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                        .foregroundStyle(accessibilityGranted ? .green : .orange)
-                        .font(.title3)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Accessibility")
-                        Text(accessibilityGranted
-                             ? "Granted — direct paste is enabled."
-                             : (requestedGrant
-                                ? "Waiting… toggle Pastely on in System Settings."
-                                : "Required to paste directly into other apps."))
-                            .font(.caption)
-                            .foregroundStyle(accessibilityGranted ? .green : .secondary)
-                    }
-                    Spacer()
-                    if !accessibilityGranted {
-                        Button("Open Settings") {
-                            requestedGrant = true
-                            PasteService.ensureAccessibility(prompt: true)
-                            openAccessibilityPane()
-                        }
-                    } else if requestedGrant {
-                        Button("Restart Pastely") { AppController.restart() }
-                    }
-                }
-            }
-            #endif
-
-            Section("Data") {
-                Toggle("Delete permanently", isOn: $settings.deletePermanently)
-                Text("Skips the five-minute Undo window: deleted clips are removed at once and cannot be recovered. Hold Option while deleting to skip Undo for one deletion, whatever this setting says.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Button("Clear Clipboard History", role: .destructive) {
-                    ClipboardStore.shared.clearHistory()
-                }
-            }
-        }
-        .formStyle(.grouped)
-        #if !MAS
-        .onAppear { accessibilityGranted = AXIsProcessTrusted() }
-        .onReceive(poll) { _ in
-            let now = AXIsProcessTrusted()
-            if now != accessibilityGranted { accessibilityGranted = now }
-        }
-        #endif
-    }
-
-    #if !MAS
-    private func openAccessibilityPane() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-            NSWorkspace.shared.open(url)
-        }
-    }
-    #endif
-
-    private var clipColorAccent: Binding<Color> {
-        Binding(
-            get: { Color(hex: settings.clipColorAccentHex) ?? .pink },
-            set: { settings.clipColorAccentHex = NSColor($0).hexString }
-        )
-    }
-
-    private func modifierPicker(selection: Binding<Int>) -> some View {
-        Picker("", selection: selection) {
-            ForEach(ShortcutModifier.allCases) { modifier in
-                Text("\(modifier.symbol) \(modifier.title)").tag(modifier.carbonValue)
-            }
-        }
-        .labelsHidden()
-        .pickerStyle(.menu)
-        .frame(minWidth: 118)
     }
 }
 
@@ -482,7 +885,7 @@ private struct AboutView: View {
             Text("Pastely").font(.system(size: 26, weight: .bold))
             Text("Version \(Bundle.main.appVersion)")
                 .font(.subheadline).foregroundStyle(.secondary)
-            Text("A free, open-source clipboard manager for macOS.\nInspired by Paste.")
+            Text("A clipboard manager for macOS in the style of Paste.\nBased on Pesty by Moamen Basel.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal)
