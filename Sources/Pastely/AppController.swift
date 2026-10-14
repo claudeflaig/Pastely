@@ -783,9 +783,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// The plus button is intentionally excluded: it creates a new pinboard
     /// rather than representing a navigable section.
     private func moveBarSection(by delta: Int) {
-        let sources: [BarSource] = [.history] + store.pinboards.map { .pinboard($0.id) }
-            + (CleanShotLibrary.shared.isAvailable ? [.cleanShot] : [])
-            + FolderLibrary.shared.folders.map { .folder($0) }
+        let sources: [BarSource] = [.history] + store.barTabs
         guard !sources.isEmpty else { return }
 
         let currentIndex = sources.firstIndex(of: store.source) ?? 0

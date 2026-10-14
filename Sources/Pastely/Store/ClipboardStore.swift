@@ -5,7 +5,7 @@ extension Notification.Name {
     static let pastelyStoreDidSave = Notification.Name("PastelyStoreDidSave")
 }
 
-enum BarSource: Equatable {
+enum BarSource: Hashable {
     case history
     case pinboard(UUID)
     /// CleanShot X's capture history: read-only, owned by CleanShot.
@@ -410,22 +410,36 @@ final class ClipboardStore {
         scheduleSave()
     }
 
-    /// Puts a pinboard where another one is, shifting the rest along, so a
-    /// dragged tab lands on the spot it was dropped.
-    func movePinboard(_ id: UUID, to targetID: UUID) {
-        guard id != targetID,
-              let from = pinboards.firstIndex(where: { $0.id == id }),
-              let to = pinboards.firstIndex(where: { $0.id == targetID }) else { return }
-        let board = pinboards.remove(at: from)
-        pinboards.insert(board, at: to)
-        scheduleSave()
+    /// The tabs after Clipboard, in the order they were dragged into:
+    /// pinboards, CleanShot and folders. Tab and the arrow keys follow it too.
+    var barTabs: [BarSource] {
+        let sources: [BarSource] = pinboards.map { .pinboard($0.id) }
+            + (CleanShotLibrary.shared.isAvailable ? [.cleanShot] : [])
+            + FolderLibrary.shared.folders.map { .folder($0) }
+        return TabOrder.sorted(sources, by: Settings.shared.tabOrder)
     }
 
-    func movePinboard(_ id: UUID, by offset: Int) {
-        guard let from = pinboards.firstIndex(where: { $0.id == id }) else { return }
-        let to = from + offset
-        guard pinboards.indices.contains(to) else { return }
-        movePinboard(id, to: pinboards[to].id)
+    func moveTab(_ source: BarSource, onto target: BarSource) {
+        let moved = TabOrder.moving(source, onto: target, in: barTabs)
+        // Keep tabs that are hidden right now (CleanShot not installed, a
+        // missing folder) in the stored order, after the visible ones.
+        let keys = moved.compactMap(TabOrder.key)
+        Settings.shared.tabOrder = keys + Settings.shared.tabOrder.filter { !keys.contains($0) }
+        // Pinboards keep the same order among themselves, for export and sync.
+        let rank = Dictionary(moved.enumerated().compactMap { offset, tab -> (UUID, Int)? in
+            if case .pinboard(let id) = tab { return (id, offset) } else { return nil }
+        }, uniquingKeysWith: { a, _ in a })
+        let reordered = pinboards.sorted { (rank[$0.id] ?? .max) < (rank[$1.id] ?? .max) }
+        if reordered.map(\.id) != pinboards.map(\.id) {
+            pinboards = reordered
+            scheduleSave()
+        }
+    }
+
+    func moveTab(_ source: BarSource, by offset: Int) {
+        let tabs = barTabs
+        guard let from = tabs.firstIndex(of: source), tabs.indices.contains(from + offset) else { return }
+        moveTab(source, onto: tabs[from + offset])
     }
 
     func recolorPinboard(_ id: UUID, to colorHex: String) {

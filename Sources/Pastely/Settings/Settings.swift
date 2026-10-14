@@ -299,6 +299,7 @@ final class Settings {
         static let hideWhileScreenSharing = "hideWhileScreenSharing"
         static let pasteStackShortcut = "pasteStackShortcut"
         static let pinnedFolders = "pinnedFolders"
+        static let tabOrder = "tabOrder"
         static let expandAbbreviations = "expandAbbreviations"
         static let tabMemory = "tabMemory"
         static let pasteStackKeyCode = "pasteStackKeyCode"
@@ -489,6 +490,11 @@ final class Settings {
         didSet { guard isLoaded else { return }; d.set(pinnedFolders, forKey: Keys.pinnedFolders) }
     }
 
+    /// The tabs after Clipboard as dragged into place, see `TabOrder`.
+    var tabOrder: [String] {
+        didSet { guard isLoaded else { return }; d.set(tabOrder, forKey: Keys.tabOrder) }
+    }
+
     var tabMemory: TabMemory {
         didSet { guard isLoaded else { return }; d.set(tabMemory.rawValue, forKey: Keys.tabMemory) }
     }
@@ -632,6 +638,7 @@ final class Settings {
         hideWhileScreenSharing = d.bool(forKey: Keys.hideWhileScreenSharing)
         pasteStackShortcut = d.bool(forKey: Keys.pasteStackShortcut)
         pinnedFolders = d.stringArray(forKey: Keys.pinnedFolders) ?? []
+        tabOrder = d.stringArray(forKey: Keys.tabOrder) ?? []
         expandAbbreviations = d.bool(forKey: Keys.expandAbbreviations)
         tabMemory = TabMemory(rawValue: d.integer(forKey: Keys.tabMemory)) ?? .fifteenMinutes
         pasteStackKeyCode = d.integer(forKey: Keys.pasteStackKeyCode)
