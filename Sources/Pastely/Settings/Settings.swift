@@ -281,6 +281,7 @@ final class Settings {
         static let playSoundOnCopy = "playSoundOnCopy"
         static let playSoundOnCapture = "playSoundOnCapture"
         static let captureSoundName = "captureSoundName"
+        static let showThumbnails = "showThumbnails"
         static let promoteOnPaste = "promoteOnPaste"
         static let ignoreConcealed = "ignoreConcealed"
         static let deletePermanently = "deletePermanently"
@@ -392,6 +393,11 @@ final class Settings {
     /// A macOS system sound, see `captureSoundChoices`.
     var captureSoundName: String {
         didSet { guard isLoaded else { return }; d.set(captureSoundName, forKey: Keys.captureSoundName) }
+    }
+
+    /// Small cards in the screen's corner for new clips and new files.
+    var showThumbnails: Bool {
+        didSet { guard isLoaded else { return }; d.set(showThumbnails, forKey: Keys.showThumbnails) }
     }
 
     /// The bright, short system sounds that read as "done".
@@ -591,6 +597,7 @@ final class Settings {
             Keys.playSoundOnCopy: false,
             Keys.playSoundOnCapture: true,
             Keys.captureSoundName: "Glass",
+            Keys.showThumbnails: true,
             Keys.promoteOnPaste: false,
             Keys.ignoreConcealed: true,
             Keys.deletePermanently: false,
@@ -634,6 +641,7 @@ final class Settings {
         playSoundOnCopy = d.bool(forKey: Keys.playSoundOnCopy)
         playSoundOnCapture = d.bool(forKey: Keys.playSoundOnCapture)
         captureSoundName = d.string(forKey: Keys.captureSoundName) ?? "Glass"
+        showThumbnails = d.bool(forKey: Keys.showThumbnails)
         promoteOnPaste = d.bool(forKey: Keys.promoteOnPaste)
         ignoreConcealed = d.bool(forKey: Keys.ignoreConcealed)
         deletePermanently = d.bool(forKey: Keys.deletePermanently)

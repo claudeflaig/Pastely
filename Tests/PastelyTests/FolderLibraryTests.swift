@@ -21,3 +21,12 @@ final class FolderLibraryTests: XCTestCase {
         XCTAssertTrue(library.items(in: dir.path).allSatisfy { $0.type == .file })
     }
 }
+
+final class FolderArrivalTests: XCTestCase {
+    @MainActor
+    func testSkipsHiddenAndUnfinishedDownloads() {
+        let names: Set<String> = ["Rechnung.pdf", ".DS_Store", "film.mp4.crdownload",
+                                  "bericht.pdf.download", "foto.jpg.part", "Bild.png"]
+        XCTAssertEqual(FolderLibrary.newArrivals(names), ["Rechnung.pdf", "Bild.png"])
+    }
+}

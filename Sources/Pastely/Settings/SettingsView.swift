@@ -378,6 +378,9 @@ private struct GeneralSettings: View {
                     .labelsHidden()
                     .fixedSize()
                 }
+                SettingsToggle(title: "Show new clips and files as thumbnails",
+                               detail: "A small card in the corner for each copy and each file that lands in a folder tab. Drag it into any app.",
+                               isOn: $settings.showThumbnails)
                 SettingsToggle(title: "Play a sound when a copy reaches Pastely", isOn: $settings.playSoundOnCapture)
                 SettingsRow(title: "Sound") {
                     Picker("", selection: $settings.captureSoundName) {
@@ -508,7 +511,7 @@ private struct AppearanceSettings: View {
                         }
                         Spacer()
                         Button {
-                            settings.pinnedFolders.removeAll { $0 == path }
+                            FolderLibrary.shared.remove(path)
                         } label: {
                             Image(systemName: "minus.circle.fill").foregroundStyle(.secondary)
                         }

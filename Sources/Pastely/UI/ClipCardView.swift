@@ -247,11 +247,13 @@ struct ClipCardView: View {
                 if let image = preview ?? ClipPreviewProvider.cachedImage(for: item) {
                     let fills = Self.imageFillsCanvas(image.size, canvas: geo.size)
                     if !fills {
+                        // Opaque blur, so the edges stay solid instead of
+                        // fading to the checkerboard.
                         Image(nsImage: image)
                             .resizable().interpolation(.low).scaledToFill()
                             .frame(width: geo.size.width, height: geo.size.height)
-                            .blur(radius: 20)
-                            .opacity(0.6)
+                            .blur(radius: 22, opaque: true)
+                            .overlay(Color.black.opacity(0.12))
                             .clipped()
                     }
                     Image(nsImage: image)

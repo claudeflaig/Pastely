@@ -11,6 +11,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let copyToast = CopyToastController()
 
     private var barController: BarWindowController?
+    var isBarPresented: Bool { barController?.isPresented == true }
     private var statusItem: NSStatusItem?
     private var pauseMenuItem: NSMenuItem?
     private var settingsWindow: NSWindow?
@@ -52,6 +53,8 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         HotKeyCenter.shared.onTrigger = { [weak self] in self?.toggleBar() }
         HotKeyCenter.shared.onStackTrigger = { PasteStack.shared.toggle() }
+        FolderLibrary.shared.onNewFile = { ThumbnailShelf.shared.show($0) }
+        FolderLibrary.shared.syncWatchers()
         #if !MAS
         HotKeyCenter.shared.onPlainTextTrigger = { [weak self] in
             guard let self else { return }

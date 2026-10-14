@@ -14,6 +14,12 @@ final class FolderLibrary {
 
     private var contents: [String: [ClipItem]] = [:]
 
+    /// Called with each file that newly lands in a watched folder.
+    @ObservationIgnored var onNewFile: ((ClipItem) -> Void)?
+    @ObservationIgnored private var watchers: [String: DispatchSourceFileSystemObject] = [:]
+    @ObservationIgnored private var known: [String: Set<String>] = [:]
+    @ObservationIgnored private var pendingCheck: [String: DispatchWorkItem] = [:]
+
     /// The folders from Settings that exist on this Mac.
     var folders: [String] {
         Settings.shared.pinnedFolders.filter { FileManager.default.fileExists(atPath: $0) }
@@ -37,12 +43,74 @@ final class FolderLibrary {
         let added = panel.urls.map(\.path).filter { !Settings.shared.pinnedFolders.contains($0) }
         Settings.shared.pinnedFolders.append(contentsOf: added)
         for path in added { refresh(path) }
+        syncWatchers()
         return added.first
     }
 
     func remove(_ path: String) {
         Settings.shared.pinnedFolders.removeAll { $0 == path }
         contents[path] = nil
+        syncWatchers()
+    }
+
+    // MARK: - Watching for new files
+
+    /// Watches every folder tab for files that arrive, such as a finished
+    /// download, and reports each one through `onNewFile`.
+    func syncWatchers() {
+        let wanted = Set(folders)
+        for (path, source) in watchers where !wanted.contains(path) {
+            source.cancel()
+            watchers[path] = nil
+            known[path] = nil
+        }
+        for path in wanted where watchers[path] == nil {
+            let fd = open(path, O_EVTONLY)
+            guard fd >= 0 else { continue }
+            known[path] = Self.names(in: path)
+            let source = DispatchSource.makeFileSystemObjectSource(
+                fileDescriptor: fd, eventMask: [.write, .rename, .link], queue: .main)
+            source.setEventHandler { [weak self] in self?.scheduleCheck(path) }
+            source.setCancelHandler { close(fd) }
+            source.resume()
+            watchers[path] = source
+        }
+    }
+
+    /// Waits for a burst of changes to settle: a download is renamed into
+    /// place, a copy grows over a moment.
+    private func scheduleCheck(_ path: String) {
+        pendingCheck[path]?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.checkForNewFiles(path) }
+        pendingCheck[path] = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: work)
+    }
+
+    private func checkForNewFiles(_ path: String) {
+        let now = Self.names(in: path)
+        let added = now.subtracting(known[path] ?? [])
+        known[path] = now
+        guard !added.isEmpty else { return }
+        refresh(path)
+        let arrived = Self.newArrivals(added)
+        for item in items(in: path) {
+            guard let url = item.fileURLs.first.flatMap(URL.init(string:)),
+                  arrived.contains(url.lastPathComponent) else { continue }
+            onNewFile?(item)
+        }
+    }
+
+    private static func names(in path: String) -> Set<String> {
+        Set((try? FileManager.default.contentsOfDirectory(atPath: path)) ?? [])
+    }
+
+    /// The names worth announcing: no hidden files and no downloads still
+    /// in progress, which arrive again under their final name when done.
+    static func newArrivals(_ names: Set<String>) -> Set<String> {
+        let partial: Set<String> = ["download", "crdownload", "part", "partial", "tmp", "opdownload"]
+        return names.filter { name in
+            !name.hasPrefix(".") && !partial.contains((name as NSString).pathExtension.lowercased())
+        }
     }
 
     static func title(for path: String) -> String {
