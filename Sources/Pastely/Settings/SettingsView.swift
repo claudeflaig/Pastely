@@ -585,6 +585,34 @@ private struct PasteStackSettings: View {
 private struct HistorySettings: View {
     @Bindable private var settings = Settings.shared
     @State private var confirmingClear = false
+    @State private var importMessage: String?
+
+    private func exportPinboards() {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "Pastely Pinboards.json"
+        panel.allowedContentTypes = [.json]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try ClipboardStore.shared.pinboardArchive().encoded().write(to: url, options: .atomic)
+            importMessage = "Exported \(ClipboardStore.shared.pinboards.count) pinboards."
+        } catch {
+            importMessage = "Export failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func importPinboards() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let archive = try PinboardArchive.decode(Data(contentsOf: url))
+            let added = ClipboardStore.shared.importPinboards(archive)
+            importMessage = "Imported \(added) clips into \(archive.pinboards.count) pinboards."
+        } catch {
+            importMessage = "This file is not a Pastely pinboard export."
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -594,6 +622,16 @@ private struct HistorySettings: View {
                 .frame(minHeight: settings.historyRetentionMode == .itemCount ? 190 : 260)
                 .padding(.horizontal, -20)
                 .padding(.vertical, -10)
+
+            SettingsCard(title: "Pinboards",
+                         footer: importMessage ?? "Save your pinboards as a file for safekeeping, or bring templates in from one.") {
+                SettingsRow(title: "Export pinboards", detail: "Writes every pinboard and its clips to a JSON file.") {
+                    Button("Export…") { exportPinboards() }.controlSize(.small)
+                }
+                SettingsRow(title: "Import pinboards", detail: "Boards with the same name are merged; duplicates are skipped.") {
+                    Button("Import…") { importPinboards() }.controlSize(.small)
+                }
+            }
 
             SettingsCard(title: "Deleting") {
                 SettingsToggle(title: "Delete permanently",
