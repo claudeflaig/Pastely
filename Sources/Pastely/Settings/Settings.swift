@@ -265,6 +265,8 @@ final class Settings {
         static let showCleanShotHistory = "showCleanShotHistory"
         static let hideWhileScreenSharing = "hideWhileScreenSharing"
         static let pasteStackShortcut = "pasteStackShortcut"
+        static let pinnedFolders = "pinnedFolders"
+        static let expandAbbreviations = "expandAbbreviations"
         static let pasteStackKeyCode = "pasteStackKeyCode"
         static let pasteStackModifiers = "pasteStackModifiers"
     }
@@ -445,6 +447,21 @@ final class Settings {
         }
     }
 
+    /// Folders listed as pinboards, by path. Downloads by default.
+    var pinnedFolders: [String] {
+        didSet { guard isLoaded else { return }; d.set(pinnedFolders, forKey: Keys.pinnedFolders) }
+    }
+
+    var expandAbbreviations: Bool {
+        didSet {
+            guard isLoaded else { return }
+            d.set(expandAbbreviations, forKey: Keys.expandAbbreviations)
+            #if !MAS
+            TextExpander.shared.refresh()
+            #endif
+        }
+    }
+
     var pasteStackKeyCode: Int {
         didSet {
             guard isLoaded else { return }
@@ -500,6 +517,8 @@ final class Settings {
             Keys.showCleanShotHistory: true,
             Keys.hideWhileScreenSharing: false,
             Keys.pasteStackShortcut: true,
+            Keys.pinnedFolders: [Settings.downloadsPath],
+            Keys.expandAbbreviations: true,
             Keys.pasteStackKeyCode: kVK_ANSI_C,
             Keys.pasteStackModifiers: cmdKey | shiftKey
         ])
@@ -538,12 +557,19 @@ final class Settings {
         showCleanShotHistory = d.bool(forKey: Keys.showCleanShotHistory)
         hideWhileScreenSharing = d.bool(forKey: Keys.hideWhileScreenSharing)
         pasteStackShortcut = d.bool(forKey: Keys.pasteStackShortcut)
+        pinnedFolders = d.stringArray(forKey: Keys.pinnedFolders) ?? []
+        expandAbbreviations = d.bool(forKey: Keys.expandAbbreviations)
         pasteStackKeyCode = d.integer(forKey: Keys.pasteStackKeyCode)
         pasteStackModifiers = d.integer(forKey: Keys.pasteStackModifiers)
         isLoaded = true
         if normalizedBarHeight != storedBarHeight {
             d.set(normalizedBarHeight, forKey: Keys.barHeight)
         }
+    }
+
+    static var downloadsPath: String {
+        let home = getpwuid(getuid()).map { String(cString: $0.pointee.pw_dir) } ?? NSHomeDirectory()
+        return home + "/Downloads"
     }
 
     var hotkeyDisplay: String {

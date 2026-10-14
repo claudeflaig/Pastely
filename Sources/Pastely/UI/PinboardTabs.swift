@@ -4,6 +4,8 @@ struct PinboardTabs: View {
     @Bindable private var store = ClipboardStore.shared
     /// The tab a card is being dragged over, highlighted as a drop target.
     @State private var dropTarget: UUID?
+    /// The tab being dragged to a new place, told apart from a dragged card.
+    @State private var draggedBoard: UUID?
     private var cleanShot: CleanShotLibrary { CleanShotLibrary.shared }
 
     var body: some View {
@@ -27,16 +29,31 @@ struct PinboardTabs: View {
                         get: { dropTarget == board.id },
                         set: { dropTarget = $0 ? board.id : (dropTarget == board.id ? nil : dropTarget) }
                     )) { _ in
+                        if let dragged = draggedBoard {
+                            draggedBoard = nil
+                            withAnimation(.easeOut(duration: 0.2)) { store.movePinboard(dragged, to: board.id) }
+                            return true
+                        }
                         guard let item = ClipDragProvider.recentlyDraggedItem else { return false }
                         ClipDragProvider.clearDraggedItem()
                         store.saveToPinboard(item, boardID: board.id)
                         return true
+                    }
+                    // Dragging a tab onto another one reorders the pinboards.
+                    .onDrag {
+                        draggedBoard = board.id
+                        ClipDragProvider.clearDraggedItem()
+                        return NSItemProvider(object: board.name as NSString)
                     }
                     // Rename lived only in the context menu, which nobody found (#100).
                     .simultaneousGesture(TapGesture(count: 2).onEnded { rename(board) })
                     .help("Double-click or right-click to rename")
                     .contextMenu {
                         Button("Rename…") { rename(board) }
+                        Button("Move Left") { store.movePinboard(board.id, by: -1) }
+                            .disabled(store.pinboards.first?.id == board.id)
+                        Button("Move Right") { store.movePinboard(board.id, by: 1) }
+                            .disabled(store.pinboards.last?.id == board.id)
                         Menu("Color") {
                             ForEach(ClipboardStore.pinboardColors, id: \.self) { hex in
                                 Button {
@@ -66,6 +83,17 @@ struct PinboardTabs: View {
                         store.source = .cleanShot; store.selectFirst()
                     }
                     .help("Your CleanShot X capture history")
+                }
+
+                ForEach(FolderLibrary.shared.folders, id: \.self) { path in
+                    pill(title: FolderLibrary.title(for: path),
+                         dot: nil,
+                         icon: path == Settings.downloadsPath ? "arrow.down.circle" : "folder",
+                         selected: store.source == .folder(path)) {
+                        FolderLibrary.shared.refresh(path)
+                        store.source = .folder(path); store.selectFirst()
+                    }
+                    .help(path)
                 }
 
                 Button(action: addPinboard) {
@@ -137,7 +165,10 @@ struct PinboardTabs: View {
 
 @MainActor
 enum TextPrompt {
-    static func run(title: String, message: String, defaultValue: String = "") -> String? {
+    /// `allowEmpty` lets an empty answer through, for prompts where clearing
+    /// the field means removing the value.
+    static func run(title: String, message: String, defaultValue: String = "",
+                    allowEmpty: Bool = false) -> String? {
         AppController.shared.suppressAutoHide = true
         defer { AppController.shared.suppressAutoHide = false }
         let alert = NSAlert()
@@ -152,6 +183,6 @@ enum TextPrompt {
         let response = alert.runModal()
         guard response == .alertFirstButtonReturn else { return nil }
         let v = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        return v.isEmpty ? nil : v
+        return v.isEmpty && !allowEmpty ? nil : v
     }
 }

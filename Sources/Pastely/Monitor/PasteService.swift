@@ -133,7 +133,7 @@ enum PasteService {
         }
     }
 
-    private static func sendCommandV() {
+    static func sendCommandV() {
         let src = CGEventSource(stateID: .combinedSessionState)
         let v = CGKeyCode(kVK_ANSI_V)
         guard let down = CGEvent(keyboardEventSource: src, virtualKey: v, keyDown: true),

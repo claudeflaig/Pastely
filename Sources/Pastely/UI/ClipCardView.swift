@@ -63,11 +63,22 @@ struct ClipCardView: View {
                 Text(customTitle ?? cardTypeLabel)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(Theme.headerText)
-                // A renamed card shows its name alone, as Paste does.
-                if customTitle == nil {
-                    Text(item.createdAt.clipRelativeLong)
-                        .font(.system(size: 12.5))
-                        .foregroundStyle(Theme.headerSubText)
+                HStack(spacing: 6) {
+                    // A renamed card shows its name alone, as Paste does.
+                    if customTitle == nil {
+                        Text(item.createdAt.clipRelativeLong)
+                            .font(.system(size: 12.5))
+                            .foregroundStyle(Theme.headerSubText)
+                    }
+                    if let abbreviation = item.abbreviation {
+                        Text(abbreviation)
+                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(Theme.headerText)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 1)
+                            .background(.white.opacity(0.25), in: Capsule())
+                            .help("Type \(abbreviation) anywhere to insert this clip")
+                    }
                 }
             }
             .lineLimit(1)
@@ -433,6 +444,13 @@ struct ClipCardView: View {
             Label("Rename…", systemImage: "pencil.line")
         }
 
+        if case .pinboard = store.source {
+            Button { setAbbreviation() } label: {
+                Label(item.abbreviation == nil ? "Set Abbreviation…" : "Change Abbreviation…",
+                      systemImage: "keyboard")
+            }
+        }
+
         Divider()
 
         Menu {
@@ -493,6 +511,15 @@ struct ClipCardView: View {
         guard [.text, .richText, .link].contains(item.type) else { return false }
         guard #available(macOS 15.2, *) else { return false }
         return NSWritingToolsCoordinator.isWritingToolsAvailable
+    }
+
+    private func setAbbreviation() {
+        let current = item.abbreviation ?? ""
+        if let value = TextPrompt.run(title: "Abbreviation",
+                                      message: "Type this anywhere to insert the clip, e.g. ;anam. Leave empty to remove it.",
+                                      defaultValue: current, allowEmpty: true) {
+            store.setAbbreviation(value, for: item)
+        }
     }
 
     private func renameItem() {

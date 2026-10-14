@@ -58,6 +58,7 @@ enum CKSchema {
         record["sourceBundleID"] = item.sourceBundleID
         record["sourceAppName"] = item.sourceAppName
         record["customTitle"] = item.customTitle
+        record["abbreviation"] = item.abbreviation
         record["createdAt"] = item.createdAt
         record["container"] = container
     }
@@ -120,6 +121,7 @@ enum CKSchema {
             sourceBundleID: record["sourceBundleID"] as? String,
             sourceAppName: record["sourceAppName"] as? String,
             customTitle: record["customTitle"] as? String,
+            abbreviation: record["abbreviation"] as? String,
             createdAt: (record["createdAt"] as? Date) ?? record.creationDate ?? Date())
         return DecodedClip(item: item,
                            container: (record["container"] as? String) ?? historyContainerValue,

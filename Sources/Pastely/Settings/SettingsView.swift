@@ -475,6 +475,31 @@ private struct AppearanceSettings: View {
                 }
             }
 
+            SettingsCard(title: "Folders as Pinboards",
+                         footer: "Each folder gets its own tab listing its newest files, ready to paste or drag.") {
+                ForEach(settings.pinnedFolders, id: \.self) { path in
+                    HStack(spacing: 10) {
+                        Image(nsImage: NSWorkspace.shared.icon(forFile: path))
+                            .resizable().frame(width: 22, height: 22)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(FolderLibrary.title(for: path)).font(.system(size: 13))
+                            Text((path as NSString).abbreviatingWithTildeInPath)
+                                .font(.system(size: 11)).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button {
+                            settings.pinnedFolders.removeAll { $0 == path }
+                        } label: {
+                            Image(systemName: "minus.circle.fill").foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Stop showing this folder")
+                    }
+                }
+                Button { addFolder() } label: { Label("Add Folder…", systemImage: "plus") }
+                    .controlSize(.small)
+            }
+
             SettingsCard(title: "Content",
                          footer: "Link previews load the page's title and image from the site the first time a link is shown.") {
                 SettingsToggle(title: "Show link previews", isOn: $settings.linkPreviews)
@@ -484,6 +509,18 @@ private struct AppearanceSettings: View {
                                isOn: $settings.showCleanShotHistory)
                 #endif
             }
+        }
+    }
+
+    private func addFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Show as Pinboard"
+        guard panel.runModal() == .OK else { return }
+        for url in panel.urls where !settings.pinnedFolders.contains(url.path) {
+            settings.pinnedFolders.append(url.path)
         }
     }
 
@@ -514,6 +551,37 @@ private struct ShortcutSettings: View {
                         .opacity(settings.pasteStackShortcut ? 1 : 0.5)
                 }
             }
+
+            #if !MAS
+            SettingsCard(title: "Abbreviations",
+                         footer: "Right-click a card in a pinboard and choose Set Abbreviation. Typing it anywhere replaces it with the clip; your clipboard is put back afterwards. Needs the Accessibility permission.") {
+                SettingsToggle(title: "Expand abbreviations as you type", isOn: $settings.expandAbbreviations)
+                let clips = ClipboardStore.shared.abbreviatedClips
+                if clips.isEmpty {
+                    Text("No abbreviations yet.")
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                } else {
+                    ForEach(clips) { clip in
+                        HStack(spacing: 10) {
+                            Text(clip.abbreviation ?? "")
+                                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                                .padding(.horizontal, 7).padding(.vertical, 2)
+                                .background(Color.accentColor.opacity(0.15), in: Capsule())
+                            Text(clip.customTitle ?? clip.displayTitle)
+                                .font(.system(size: 13)).lineLimit(1)
+                            Spacer()
+                            Button {
+                                ClipboardStore.shared.setAbbreviation(nil, for: clip)
+                            } label: {
+                                Image(systemName: "minus.circle.fill").foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Remove this abbreviation")
+                        }
+                    }
+                }
+            }
+            #endif
 
             SettingsCard(title: "Quick Paste",
                          footer: "Hold the plain-text modifier as well to strip formatting; with the defaults, ⌘⇧1 pastes the first clip as plain text. The two can never share a modifier; picking one that is taken swaps them.") {

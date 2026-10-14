@@ -10,6 +10,8 @@ enum BarSource: Equatable {
     case pinboard(UUID)
     /// CleanShot X's capture history: read-only, owned by CleanShot.
     case cleanShot
+    /// A folder's contents, such as Downloads, newest first: read-only.
+    case folder(String)
 }
 
 /// Whether keyboard focus currently belongs to the native search field or
@@ -120,6 +122,8 @@ final class ClipboardStore {
             base = pinboards.first(where: { $0.id == id })?.items ?? []
         case .cleanShot:
             base = CleanShotLibrary.shared.items
+        case .folder(let path):
+            base = FolderLibrary.shared.items(in: path)
         }
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let filter = self.filter
@@ -268,8 +272,8 @@ final class ClipboardStore {
             guard let boardIndex = pinboards.firstIndex(where: { $0.id == boardID }) else { return }
             placements = Self.placements(of: ids, in: pinboards[boardIndex].items, container: source)
             pinboards[boardIndex].items.removeAll { ids.contains($0.id) }
-        case .cleanShot:
-            // Captures belong to CleanShot; deleting them is done there.
+        case .cleanShot, .folder:
+            // Captures and folder files are owned by CleanShot and Finder.
             return
         }
         if permanently || Settings.shared.deletePermanently {
@@ -332,7 +336,7 @@ final class ClipboardStore {
                     continue
                 }
                 if restore(placement, into: &pinboards[i].items) { restored.append(placement.item.id) }
-            case .cleanShot:
+            case .cleanShot, .folder:
                 continue
             }
         }
@@ -406,6 +410,24 @@ final class ClipboardStore {
         scheduleSave()
     }
 
+    /// Puts a pinboard where another one is, shifting the rest along, so a
+    /// dragged tab lands on the spot it was dropped.
+    func movePinboard(_ id: UUID, to targetID: UUID) {
+        guard id != targetID,
+              let from = pinboards.firstIndex(where: { $0.id == id }),
+              let to = pinboards.firstIndex(where: { $0.id == targetID }) else { return }
+        let board = pinboards.remove(at: from)
+        pinboards.insert(board, at: to)
+        scheduleSave()
+    }
+
+    func movePinboard(_ id: UUID, by offset: Int) {
+        guard let from = pinboards.firstIndex(where: { $0.id == id }) else { return }
+        let to = from + offset
+        guard pinboards.indices.contains(to) else { return }
+        movePinboard(id, to: pinboards[to].id)
+    }
+
     func recolorPinboard(_ id: UUID, to colorHex: String) {
         guard let i = pinboards.firstIndex(where: { $0.id == id }) else { return }
         pinboards[i].colorHex = colorHex
@@ -445,6 +467,7 @@ final class ClipboardStore {
             sourceBundleID: item.sourceBundleID,
             sourceAppName: item.sourceAppName,
             customTitle: item.customTitle,
+            abbreviation: item.abbreviation,
             createdAt: createdAt)
         if let dup = duplicateImageFile(item) { copy.imageFileName = dup }
         return copy
@@ -546,6 +569,31 @@ final class ClipboardStore {
             }
         }
         scheduleSave()
+    }
+
+    /// Sets the text that expands into this clip; nil or empty removes it.
+    /// An abbreviation belongs to one clip at a time.
+    func setAbbreviation(_ abbreviation: String?, for item: ClipItem) {
+        let value = abbreviation?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let new = value?.isEmpty == false ? value : nil
+        for b in pinboards.indices {
+            for i in pinboards[b].items.indices {
+                if pinboards[b].items[i].id == item.id {
+                    pinboards[b].items[i].abbreviation = new
+                } else if new != nil, pinboards[b].items[i].abbreviation == new {
+                    pinboards[b].items[i].abbreviation = nil
+                }
+            }
+        }
+        scheduleSave()
+        #if !MAS
+        TextExpander.shared.refresh()
+        #endif
+    }
+
+    /// Every pinned clip that has an abbreviation.
+    var abbreviatedClips: [ClipItem] {
+        pinboards.flatMap(\.items).filter { $0.abbreviation?.isEmpty == false }
     }
 
     func selectFirst() { selectedID = visibleItems.first?.id }

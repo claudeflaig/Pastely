@@ -15,6 +15,8 @@ struct ClipItem: Identifiable, Codable, Equatable {
     var sourceAppName: String?
 
     var customTitle: String?
+    /// Typing this anywhere replaces it with the clip, e.g. ";anam".
+    var abbreviation: String?
     var createdAt: Date
 
     init(id: UUID = UUID(),
@@ -29,6 +31,7 @@ struct ClipItem: Identifiable, Codable, Equatable {
          sourceBundleID: String? = nil,
          sourceAppName: String? = nil,
          customTitle: String? = nil,
+         abbreviation: String? = nil,
          createdAt: Date = Date()) {
         self.id = id
         self.type = type
@@ -42,6 +45,7 @@ struct ClipItem: Identifiable, Codable, Equatable {
         self.sourceBundleID = sourceBundleID
         self.sourceAppName = sourceAppName
         self.customTitle = customTitle
+        self.abbreviation = abbreviation
         self.createdAt = createdAt
     }
 

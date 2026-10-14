@@ -22,6 +22,7 @@ struct PinboardArchive: Codable, Equatable {
         var sourceBundleID: String?
         var sourceAppName: String?
         var createdAt: Date?
+        var abbreviation: String?
     }
 
     var format = "pastely.pinboards"
@@ -56,6 +57,7 @@ struct PinboardArchive: Codable, Equatable {
                             sourceBundleID: item.sourceBundleID,
                             sourceAppName: item.sourceAppName,
                             customTitle: item.title,
+                            abbreviation: item.abbreviation,
                             createdAt: item.createdAt ?? Date())
         return (clip, item.imagePNG)
     }
@@ -83,7 +85,8 @@ extension ClipboardStore {
                                                 html: item.htmlData,
                                                 sourceBundleID: item.sourceBundleID,
                                                 sourceAppName: item.sourceAppName,
-                                                createdAt: item.createdAt)
+                                                createdAt: item.createdAt,
+                                                abbreviation: item.abbreviation)
                 })
         })
     }

@@ -52,6 +52,9 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         HotKeyCenter.shared.onTrigger = { [weak self] in self?.toggleBar() }
         HotKeyCenter.shared.onStackTrigger = { PasteStack.shared.toggle() }
+        #if !MAS
+        TextExpander.shared.refresh()
+        #endif
         HotKeyCenter.shared.start()
 
         setMenuBarIconVisible(Settings.shared.showMenuBarIcon)
@@ -347,6 +350,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         store.filter = ClipFilter()
         store.source = .history
         CleanShotLibrary.shared.refresh()
+        FolderLibrary.shared.refreshAll()
         ImageTextIndex.index(store.history + store.pinboards.flatMap(\.items) + CleanShotLibrary.shared.items)
         store.prepareForBarPresentation()
 
@@ -682,6 +686,10 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return nil
         case kVK_Return, kVK_ANSI_KeypadEnter:
             pasteSelected(); return nil
+        case kVK_Tab:
+            // Tab and Shift-Tab step through Clipboard and the pinboards.
+            moveBarSection(by: event.modifierFlags.contains(.shift) ? -1 : 1)
+            return nil
         case kVK_LeftArrow:
             if cmd { moveBarSection(by: -1) } else { store.moveSelection(by: -1) }
             return nil
@@ -756,6 +764,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func moveBarSection(by delta: Int) {
         let sources: [BarSource] = [.history] + store.pinboards.map { .pinboard($0.id) }
             + (CleanShotLibrary.shared.isAvailable ? [.cleanShot] : [])
+            + FolderLibrary.shared.folders.map { .folder($0) }
         guard !sources.isEmpty else { return }
 
         let currentIndex = sources.firstIndex(of: store.source) ?? 0

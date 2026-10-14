@@ -109,7 +109,7 @@ final class CleanShotLibrary {
 
     /// The same capture keeps its identity across refreshes, so the selection
     /// survives a reload.
-    private static func stableID(for url: URL) -> UUID {
+    static func stableID(for url: URL) -> UUID {
         var bytes = Array(Insecure.MD5.hash(data: Data(url.path.utf8)))
         bytes[6] = (bytes[6] & 0x0F) | 0x30
         bytes[8] = (bytes[8] & 0x3F) | 0x80

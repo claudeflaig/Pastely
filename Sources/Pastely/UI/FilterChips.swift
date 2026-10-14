@@ -104,6 +104,7 @@ struct FilterChips: View {
         case .history: base = store.history
         case .pinboard(let id): base = store.pinboards.first { $0.id == id }?.items ?? []
         case .cleanShot: base = CleanShotLibrary.shared.items
+        case .folder(let path): base = FolderLibrary.shared.items(in: path)
         }
         return ClipFilter.apps(in: base)
     }
