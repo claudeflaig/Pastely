@@ -41,26 +41,28 @@ Ohne Zertifikat signiert das Build-Skript Pastely „ad hoc“. macOS hält dann
 3. `bash scripts/build_app.sh` erneut ausführen. Fragt macOS, ob `codesign` den Schlüssel verwenden darf: **Always Allow**.
 4. Die Freigaben ein letztes Mal erteilen. Ab dann bleiben sie bei jedem Neubau erhalten.
 
-## An Freunde weitergeben
+## Installieren (für Freunde)
 
-Das eigene Zertifikat gilt nur auf diesem Mac. Für andere Macs signiert `scripts/release.sh` mit einer Developer ID, lässt Apple die App prüfen (Notarisierung) und legt `packaging/Pastely-<Version>.dmg` ab. Diese Datei öffnet sich überall ohne Warnung.
+1. Unter **Releases** auf GitHub die neueste `Pastely-….dmg` laden und öffnen.
+2. Pastely in den Ordner **Applications** ziehen und starten.
+3. macOS meldet beim ersten Start, dass es die App nicht prüfen kann. Dann **System Settings → Privacy & Security** öffnen, ganz nach unten scrollen und bei Pastely **Open Anyway** wählen, danach noch einmal bestätigen.
+4. Unter **System Settings → Privacy & Security → Accessibility** Pastely erlauben, damit es in andere Apps einfügen kann.
 
-Einmalig einrichten (braucht die Mitgliedschaft im Apple Developer Program):
+Leiste öffnen mit ⇧⌘V. Eine neue Version installiert man genauso: Sie ersetzt die alte, die Accessibility-Freigabe bleibt erhalten, nur Schritt 3 kann nochmals nötig sein.
 
-1. **Xcode → Settings → Accounts** → Apple-ID wählen → **Manage Certificates…** → **+** → **Developer ID Application**.
-2. Auf [account.apple.com](https://account.apple.com) unter **Sign-In and Security → App-Specific Passwords** ein Passwort für „Pastely Notarisierung“ erzeugen.
-3. Die Zugangsdaten im Schlüsselbund speichern (fragt nach dem Passwort aus Schritt 2):
-   ```bash
-   xcrun notarytool store-credentials pastely-notary --apple-id DEINE_APPLE_ID --team-id B9A464EMSV
-   ```
-
-Danach für jede Version:
+## Weitergeben
 
 ```bash
 VERSION=1.0.1 BUILD=2 bash scripts/release.sh
 ```
 
-Bei den Freunden: DMG öffnen, Pastely in **Applications** ziehen, starten und unter **System Settings → Privacy & Security → Accessibility** erlauben. Updates gibt es nur so, wie man sie verschickt: eine neue DMG, die die alte App ersetzt.
+Das legt `packaging/Pastely-<Version>.dmg` ab, signiert mit dem eigenen Zertifikat „Pastely Developer“. Die Datei als Release auf GitHub hochladen:
+
+```bash
+gh release create v1.0.1 packaging/Pastely-1.0.1.dmg --title "Pastely 1.0.1"
+```
+
+Optional ohne die Warnung aus Schritt 3: Mit einem **Developer ID Application**-Zertifikat (Xcode → Settings → Accounts → Manage Certificates) und einem gespeicherten Notarisierungs-Profil (`xcrun notarytool store-credentials pastely-notary --apple-id … --team-id B9A464EMSV`, mit einem App-spezifischen Passwort) lässt `release.sh` die App zusätzlich von Apple notarisieren.
 
 ## Tests
 

@@ -16,3 +16,7 @@ packaging/Pastely.iconset/
 
 packaging/*.pkg
 packaging/*.provisionprofile
+
+# iCloud Drive conflict copies (e.g. "Pastely 2.app")
+* [0-9].*
+* [0-9]
