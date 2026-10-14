@@ -378,9 +378,12 @@ private struct GeneralSettings: View {
                     .labelsHidden()
                     .fixedSize()
                 }
-                SettingsToggle(title: "Show new clips and files as thumbnails",
-                               detail: "A small card in the corner for each copy and each file that lands in a folder tab. Drag it into any app.",
-                               isOn: $settings.showThumbnails)
+                SettingsToggle(title: "Put new copies on the Shelf",
+                               detail: "The Shelf is a small window you can move anywhere. Drag items out of it into any app; it closes once it is empty.",
+                               isOn: $settings.shelfForClips)
+                SettingsToggle(title: "Put new files from folder tabs on the Shelf",
+                               detail: "For example each finished download.",
+                               isOn: $settings.shelfForFolders)
                 SettingsToggle(title: "Play a sound when a copy reaches Pastely", isOn: $settings.playSoundOnCapture)
                 SettingsRow(title: "Sound") {
                     Picker("", selection: $settings.captureSoundName) {

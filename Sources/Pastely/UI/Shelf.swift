@@ -1,0 +1,684 @@
+import AppKit
+import Observation
+import QuickLookThumbnailing
+import SwiftUI
+
+/// A small window that collects new copies and new files from folder tabs,
+/// as Dropover's shelf does. It stays until it is closed or emptied: drag
+/// the stack out to use everything, or open it to drag items one by one.
+/// It can be moved anywhere and opens there again.
+@MainActor
+final class Shelf {
+    static let shared = Shelf()
+
+    let model = ShelfModel()
+    private var panel: NSPanel?
+
+    private static let collapsedSize = NSSize(width: 214, height: 226)
+    private static let expandedSize = NSSize(width: 448, height: 340)
+    private static let positionKey = "shelfTopLeft"
+
+    private init() {
+        model.onChange = { [weak self] in self?.layout() }
+    }
+
+    func add(_ item: ClipItem) {
+        model.add(item)
+    }
+
+    private func layout() {
+        guard !model.items.isEmpty else {
+            panel?.orderOut(nil)
+            model.expanded = false
+            return
+        }
+        let panel = self.panel ?? makePanel()
+        let size = model.expanded ? Self.expandedSize : Self.collapsedSize
+        let topLeft = clampedTopLeft(for: size)
+        panel.setFrame(NSRect(x: topLeft.x, y: topLeft.y - size.height, width: size.width, height: size.height),
+                       display: true, animate: panel.isVisible)
+        if !panel.isVisible {
+            panel.alphaValue = 0
+            panel.orderFrontRegardless()
+            NSAnimationContext.runAnimationGroup { $0.duration = 0.18; panel.animator().alphaValue = 1 }
+        }
+    }
+
+    /// Where the shelf was left, kept fully on a screen; the lower right
+    /// corner the first time.
+    private func clampedTopLeft(for size: NSSize) -> NSPoint {
+        let saved = UserDefaults.standard.string(forKey: Self.positionKey).map(NSPointFromString)
+        let screen = saved.flatMap { point in NSScreen.screens.first { $0.frame.contains(point) } }
+            ?? NSScreen.main ?? NSScreen.screens.first
+        guard let visible = screen?.visibleFrame else { return .zero }
+        var point = saved ?? NSPoint(x: visible.maxX - Self.collapsedSize.width - 20,
+                                     y: visible.minY + Self.collapsedSize.height + 20)
+        point.x = min(max(point.x, visible.minX + 8), visible.maxX - size.width - 8)
+        point.y = min(max(point.y, visible.minY + size.height + 8), visible.maxY - 8)
+        return point
+    }
+
+    private func makePanel() -> NSPanel {
+        let panel = NSPanel(contentRect: NSRect(origin: .zero, size: Self.collapsedSize),
+                            styleMask: [.borderless, .nonactivatingPanel],
+                            backing: .buffered, defer: false)
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.level = .floating
+        panel.hidesOnDeactivate = false
+        panel.isMovable = true
+        panel.appearance = NSAppearance(named: .darkAqua)
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.sharingType = Settings.shared.hideWhileScreenSharing ? .none : .readOnly
+        panel.contentView = NSHostingView(rootView: ShelfView(model: model))
+        NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: panel,
+                                               queue: .main) { [weak panel] _ in
+            guard let frame = panel?.frame else { return }
+            UserDefaults.standard.set(NSStringFromPoint(NSPoint(x: frame.minX, y: frame.maxY)),
+                                      forKey: Self.positionKey)
+        }
+        self.panel = panel
+        return panel
+    }
+}
+
+@Observable
+@MainActor
+final class ShelfModel {
+    private(set) var items: [ClipItem] = []
+    var expanded = false { didSet { if expanded != oldValue { onChange?() } } }
+    var listMode = false
+    @ObservationIgnored var onChange: (() -> Void)?
+
+    func add(_ item: ClipItem) {
+        // The same copy or file again moves to the top instead of doubling.
+        items.removeAll { $0.id == item.id || $0.sameContent(as: item) }
+        items.append(item)
+        onChange?()
+    }
+
+    func remove(_ removed: [ClipItem]) {
+        let ids = Set(removed.map(\.id))
+        items.removeAll { ids.contains($0.id) }
+        onChange?()
+    }
+
+    func clear() {
+        items.removeAll()
+        onChange?()
+    }
+
+    /// "2 Documents", "3 Images", "4 Items" for a mix.
+    static func title(for items: [ClipItem]) -> String {
+        let kinds = Set(items.map(kind))
+        let word = kinds.count == 1 ? kinds.first! : "Item"
+        return "\(items.count) \(word)\(items.count == 1 ? "" : "s")"
+    }
+
+    private static func kind(_ item: ClipItem) -> String {
+        switch item.type {
+        case .image: "Image"
+        case .file: ClipPreviewProvider.imageFileURL(for: item) != nil ? "Image" : "Document"
+        case .link: "Link"
+        case .color: "Color"
+        case .text, .richText: "Text"
+        }
+    }
+
+    /// Files on disk behind the items, for their size and Reveal in Finder.
+    static func fileURLs(of items: [ClipItem]) -> [URL] {
+        items.flatMap { item -> [URL] in
+            switch item.type {
+            case .file: item.fileURLs.compactMap(URL.init(string:)).filter(\.isFileURL)
+            case .image: ClipboardStore.shared.imageURL(for: item).map { [$0] } ?? []
+            default: []
+            }
+        }
+    }
+
+    static func sizeText(of items: [ClipItem]) -> String? {
+        let bytes = fileURLs(of: items).reduce(Int64(0)) { sum, url in
+            sum + Int64((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+        }
+        return bytes > 0 ? ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file) : nil
+    }
+}
+
+// MARK: - Views
+
+struct ShelfView: View {
+    @Bindable var model: ShelfModel
+
+    var body: some View {
+        ZStack {
+            WindowDragArea()
+            Group {
+                if model.expanded { expanded } else { collapsed }
+            }
+            .padding(12)
+        }
+        .background(VisualEffectView(material: .hudWindow, blending: .behindWindow))
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous)
+            .strokeBorder(.white.opacity(0.12), lineWidth: 1))
+    }
+
+    // MARK: Stack
+
+    private var collapsed: some View {
+        VStack(spacing: 0) {
+            ZStack {
+                Capsule().fill(.white.opacity(0.25)).frame(width: 34, height: 4)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .padding(.top, -4)
+                    .allowsHitTesting(false)
+                HStack {
+                    CircleButton(symbol: "xmark", help: "Close the Shelf") { model.clear() }
+                    Spacer()
+                    Menu {
+                        actions(for: model.items)
+                        Divider()
+                        Button("Close Shelf") { model.clear() }
+                    } label: {
+                        CircleButtonLabel(symbol: "chevron.down")
+                    }
+                    // The button style keeps the label as drawn; a borderless
+                    // menu would drop its circle.
+                    .menuStyle(.button)
+                    .buttonStyle(.plain)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                }
+            }
+            .frame(height: 38)
+
+            ZStack {
+                let shown = Array(model.items.suffix(3))
+                ForEach(Array(shown.enumerated()), id: \.element.id) { index, item in
+                    let fromTop = shown.count - 1 - index
+                    ShelfThumbnail(item: item, side: 96)
+                        .rotationEffect(.degrees(fromTop == 0 ? 0 : (fromTop == 1 ? -7 : 6)))
+                        .offset(x: fromTop == 0 ? 0 : (fromTop == 1 ? -6 : 7), y: CGFloat(fromTop) * -3)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay {
+                ShelfDragSource(items: { model.items },
+                                onClick: { model.expanded = true },
+                                menu: { menuItems(for: model.items) },
+                                onDragged: { model.remove($0) })
+            }
+            .help("Drag everything into an app, or click to see each item")
+
+            Button { model.expanded = true } label: {
+                HStack(spacing: 6) {
+                    Text(ShelfModel.title(for: model.items))
+                        .font(.system(size: 14, weight: .regular))
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .regular))
+                        .foregroundStyle(.secondary)
+                }
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 16)
+                .frame(height: 34)
+                .background(.white.opacity(0.12), in: Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    // MARK: Open
+
+    private var expanded: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                CircleButton(symbol: "chevron.left", help: "Back") { model.expanded = false }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(ShelfModel.title(for: model.items))
+                        .font(.system(size: 16, weight: .medium))
+                    if let size = ShelfModel.sizeText(of: model.items) {
+                        Text(size).font(.system(size: 12, weight: .light)).foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                HStack(spacing: 0) {
+                    modeButton("square.grid.2x2", list: false)
+                    modeButton("list.bullet", list: true)
+                }
+                .padding(3)
+                .background(.white.opacity(0.1), in: Capsule())
+            }
+
+            ScrollView {
+                if model.listMode {
+                    LazyVStack(spacing: 4) {
+                        ForEach(model.items.reversed()) { item in row(item) }
+                    }
+                } else {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 116), spacing: 10)], spacing: 14) {
+                        ForEach(model.items.reversed()) { item in tile(item) }
+                        if !ShelfModel.fileURLs(of: model.items).isEmpty { revealTile }
+                    }
+                    .padding(.top, 4)
+                }
+            }
+        }
+    }
+
+    private func modeButton(_ symbol: String, list: Bool) -> some View {
+        Button { model.listMode = list } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .regular))
+                .frame(width: 34, height: 28)
+                .background(model.listMode == list ? .white.opacity(0.18) : .clear, in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func tile(_ item: ClipItem) -> some View {
+        VStack(spacing: 6) {
+            ShelfThumbnail(item: item, side: 72)
+                .frame(height: 80)
+            Text(ShelfItemText.name(of: item))
+                .font(.system(size: 12.5, weight: .regular))
+                .lineLimit(1).truncationMode(.middle)
+            Text(ShelfItemText.detail(of: item))
+                .font(.system(size: 11, weight: .light))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
+        .overlay { dragSource(for: item) }
+    }
+
+    private func row(_ item: ClipItem) -> some View {
+        HStack(spacing: 10) {
+            ShelfThumbnail(item: item, side: 30)
+            Text(ShelfItemText.name(of: item))
+                .font(.system(size: 13, weight: .regular))
+                .lineLimit(1).truncationMode(.middle)
+            Spacer()
+            Text(ShelfItemText.detail(of: item))
+                .font(.system(size: 11.5, weight: .light))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 40)
+        .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
+        .overlay { dragSource(for: item) }
+    }
+
+    private var revealTile: some View {
+        Button { NSWorkspace.shared.activateFileViewerSelecting(ShelfModel.fileURLs(of: model.items)) } label: {
+            VStack(spacing: 8) {
+                Image(systemName: "arrowshape.turn.up.right.circle")
+                    .font(.system(size: 44, weight: .ultraLight))
+                    .foregroundStyle(.secondary)
+                    .frame(height: 80)
+                Text("Reveal in Finder").font(.system(size: 12.5, weight: .regular))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func dragSource(for item: ClipItem) -> some View {
+        ShelfDragSource(items: { [item] },
+                        onDoubleClick: { ShelfActions.open(item) },
+                        menu: { menuItems(for: [item]) + [ShelfMenuItem(title: "Remove from Shelf") { model.remove([item]) }] },
+                        onDragged: { model.remove($0) })
+    }
+
+    @ViewBuilder
+    private func actions(for items: [ClipItem]) -> some View {
+        ForEach(menuItems(for: items)) { entry in
+            Button(entry.title, action: entry.action)
+        }
+    }
+
+    private func menuItems(for items: [ClipItem]) -> [ShelfMenuItem] {
+        var entries = [ShelfMenuItem(title: items.count == 1 ? "Copy" : "Copy All") { ShelfActions.copy(items) }]
+        let urls = ShelfModel.fileURLs(of: items)
+        if !urls.isEmpty {
+            entries.append(ShelfMenuItem(title: "Reveal in Finder") {
+                NSWorkspace.shared.activateFileViewerSelecting(urls)
+            })
+        }
+        if items.count == 1, let item = items.first {
+            entries.insert(ShelfMenuItem(title: "Open") { ShelfActions.open(item) }, at: 0)
+        }
+        return entries
+    }
+}
+
+private struct CircleButton: View {
+    let symbol: String
+    let help: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) { CircleButtonLabel(symbol: symbol) }
+            .buttonStyle(.plain)
+            .help(help)
+    }
+}
+
+private struct CircleButtonLabel: View {
+    let symbol: String
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 14, weight: .medium))
+            .foregroundStyle(.primary)
+            .frame(width: 36, height: 36)
+            .background(.white.opacity(0.12), in: Circle())
+            .contentShape(Circle())
+    }
+}
+
+/// A file's QuickLook thumbnail, a picture, a sheet of text or a color.
+struct ShelfThumbnail: View {
+    let item: ClipItem
+    let side: CGFloat
+    @State private var image: NSImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(nsImage: image)
+                    .resizable().interpolation(.high).scaledToFit()
+                    .shadow(color: .black.opacity(0.35), radius: 4, y: 2)
+            } else {
+                placeholder
+            }
+        }
+        .frame(width: side, height: side)
+        .task(id: item.id) { image = await ShelfThumbnails.image(for: item, side: side) }
+    }
+
+    @ViewBuilder
+    private var placeholder: some View {
+        switch item.type {
+        case .color:
+            RoundedRectangle(cornerRadius: side * 0.12, style: .continuous)
+                .fill(Color(hex: item.colorHex ?? "#000") ?? .black)
+                .frame(width: side * 0.8, height: side * 0.8)
+                .shadow(color: .black.opacity(0.35), radius: 4, y: 2)
+        case .link:
+            paper {
+                VStack(spacing: side * 0.06) {
+                    Image(systemName: "globe").font(.system(size: side * 0.22, weight: .light))
+                    Text(URL(string: item.text ?? "")?.host() ?? item.text ?? "")
+                        .font(.system(size: max(5, side * 0.08)))
+                        .lineLimit(2)
+                }
+                .foregroundStyle(Color.black.opacity(0.6))
+            }
+        case .text, .richText:
+            paper {
+                Text(item.text ?? "")
+                    .font(.system(size: max(3, side * 0.055)))
+                    .foregroundStyle(Color.black.opacity(0.7))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+        case .image, .file:
+            Image(nsImage: ClipPreviewProvider.cachedIcon(for: item)
+                  ?? NSWorkspace.shared.icon(for: .data))
+                .resizable().scaledToFit()
+        }
+    }
+
+    /// A white page in portrait, like a document's preview.
+    private func paper<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        content()
+            .padding(side * 0.07)
+            .frame(width: side * 0.72, height: side * 0.92)
+            .background(.white, in: RoundedRectangle(cornerRadius: side * 0.05))
+            .clipped()
+            .shadow(color: .black.opacity(0.35), radius: 4, y: 2)
+    }
+}
+
+@MainActor
+enum ShelfThumbnails {
+    private static let cache = NSCache<NSString, NSImage>()
+
+    static func image(for item: ClipItem, side: CGFloat) async -> NSImage? {
+        guard let url = ShelfModel.fileURLs(of: [item]).first else { return nil }
+        let key = "\(url.path)|\(Int(side))" as NSString
+        if let cached = cache.object(forKey: key) { return cached }
+        let scale = NSScreen.main?.backingScaleFactor ?? 2
+        let request = QLThumbnailGenerator.Request(fileAt: url, size: CGSize(width: side, height: side),
+                                                   scale: scale, representationTypes: .thumbnail)
+        let representation = try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request)
+        let image = representation?.nsImage ?? NSWorkspace.shared.icon(forFile: url.path)
+        cache.setObject(image, forKey: key)
+        return image
+    }
+}
+
+enum ShelfItemText {
+    @MainActor
+    static func name(of item: ClipItem) -> String {
+        switch item.type {
+        case .file:
+            item.fileURLs.first.flatMap(URL.init(string:))?.lastPathComponent ?? item.displayTitle
+        case .image:
+            "Image"
+        case .color:
+            (item.colorHex ?? "").uppercased()
+        case .link, .text, .richText:
+            (item.text ?? "").split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+        }
+    }
+
+    @MainActor
+    static func detail(of item: ClipItem) -> String {
+        if let size = ShelfModel.sizeText(of: [item]) { return size }
+        switch item.type {
+        case .link: return URL(string: item.text ?? "")?.host() ?? "Link"
+        case .color: return "Color"
+        default: return "\((item.text ?? "").count) characters"
+        }
+    }
+}
+
+@MainActor
+enum ShelfActions {
+    /// A file opens in its app; a clip opens the bar.
+    static func open(_ item: ClipItem) {
+        if let url = ShelfModel.fileURLs(of: [item]).first {
+            NSWorkspace.shared.open(url)
+        } else if item.type == .link, let url = URL(string: item.text ?? "") {
+            NSWorkspace.shared.open(url)
+        } else {
+            AppController.shared.showBar()
+        }
+    }
+
+    /// Copies without the copy landing on the Shelf again.
+    static func copy(_ items: [ClipItem]) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.writeObjects(items.flatMap(writers(for:)))
+        AppController.shared.monitor.suppressUntilChangeCount = pasteboard.changeCount
+    }
+
+    /// What a dragged or copied item puts on the pasteboard. Images go as a
+    /// file with a readable name, so Finder and Mail receive a real file.
+    static func writers(for item: ClipItem) -> [NSPasteboardWriting] {
+        switch item.type {
+        case .file:
+            let urls = item.fileURLs.compactMap(URL.init(string:)).filter(\.isFileURL)
+            if !urls.isEmpty { return urls as [NSURL] }
+        case .image:
+            if let url = namedImageCopy(of: item) { return [url as NSURL] }
+        case .link:
+            if let url = URL(string: item.text ?? "") { return [url as NSURL] }
+        case .color:
+            return [(item.colorHex ?? "") as NSString]
+        case .text, .richText:
+            break
+        }
+        return [(item.text ?? item.displayTitle) as NSString]
+    }
+
+    private static func namedImageCopy(of item: ClipItem) -> URL? {
+        guard let source = ClipboardStore.shared.imageURL(for: item) else { return nil }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Pastely Shelf", isDirectory: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
+        let name = "Image \(formatter.string(from: item.createdAt)).\(source.pathExtension)"
+        let target = folder.appendingPathComponent(name)
+        if !FileManager.default.fileExists(atPath: target.path) {
+            try? FileManager.default.copyItem(at: source, to: target)
+        }
+        return FileManager.default.fileExists(atPath: target.path) ? target : source
+    }
+}
+
+// MARK: - AppKit drag source
+
+struct ShelfMenuItem: Identifiable {
+    let id = UUID()
+    let title: String
+    let action: () -> Void
+}
+
+/// Clicks, double-clicks, right-clicks and drags on Shelf items. Done in
+/// AppKit because only an NSDraggingSource hears whether a drop landed,
+/// which is when the Shelf lets go of what was dragged.
+struct ShelfDragSource: NSViewRepresentable {
+    let items: () -> [ClipItem]
+    var onClick: (() -> Void)? = nil
+    var onDoubleClick: (() -> Void)? = nil
+    var menu: () -> [ShelfMenuItem] = { [] }
+    let onDragged: ([ClipItem]) -> Void
+
+    func makeNSView(context: Context) -> ShelfDragSourceView { ShelfDragSourceView() }
+
+    func updateNSView(_ view: ShelfDragSourceView, context: Context) {
+        view.items = items
+        view.onClick = onClick
+        view.onDoubleClick = onDoubleClick
+        view.menuItems = menu
+        view.onDragged = onDragged
+    }
+}
+
+final class ShelfDragSourceView: NSView, NSDraggingSource {
+    var items: () -> [ClipItem] = { [] }
+    var onClick: (() -> Void)?
+    var onDoubleClick: (() -> Void)?
+    var menuItems: () -> [ShelfMenuItem] = { [] }
+    var onDragged: ([ClipItem]) -> Void = { _ in }
+
+    private var downEvent: NSEvent?
+    private var dragging = false
+    private var draggedItems: [ClipItem] = []
+
+    override var mouseDownCanMoveWindow: Bool { false }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func mouseDown(with event: NSEvent) {
+        downEvent = event
+        dragging = false
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let down = downEvent, !dragging else { return }
+        let dx = event.locationInWindow.x - down.locationInWindow.x
+        let dy = event.locationInWindow.y - down.locationInWindow.y
+        guard dx * dx + dy * dy > 16 else { return }
+        dragging = true
+        startDrag(with: down)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        defer { downEvent = nil }
+        guard !dragging else { return }
+        if event.clickCount == 2 { onDoubleClick?() } else if event.clickCount == 1 { onClick?() }
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let entries = menuItems()
+        guard !entries.isEmpty else { return nil }
+        let menu = NSMenu()
+        for entry in entries { menu.addItem(ClosureMenuItem(title: entry.title, action: entry.action)) }
+        return menu
+    }
+
+    private func startDrag(with event: NSEvent) {
+        let items = self.items()
+        guard !items.isEmpty else { return }
+        draggedItems = items
+        let image = dragImage()
+        var draggingItems: [NSDraggingItem] = []
+        for (index, writer) in items.flatMap(ShelfActions.writers(for:)).enumerated() {
+            let draggingItem = NSDraggingItem(pasteboardWriter: writer)
+            let offset = CGFloat(min(index, 4)) * 6
+            let frame = NSRect(x: bounds.midX - 32 + offset, y: bounds.midY - 32 - offset, width: 64, height: 64)
+            draggingItem.setDraggingFrame(frame, contents: index == 0 ? image : nil)
+            draggingItems.append(draggingItem)
+        }
+        let session = beginDraggingSession(with: draggingItems, event: event, source: self)
+        session.animatesToStartingPositionsOnCancelOrFail = true
+        session.draggingFormation = .pile
+    }
+
+    /// What is under the pointer, as the drag image.
+    private func dragImage() -> NSImage {
+        guard let superview, let rep = superview.bitmapImageRepForCachingDisplay(in: frame) else {
+            return NSImage(size: NSSize(width: 64, height: 64))
+        }
+        superview.cacheDisplay(in: frame, to: rep)
+        let image = NSImage(size: NSSize(width: 64, height: 64))
+        image.addRepresentation(rep)
+        return image
+    }
+
+    func draggingSession(_ session: NSDraggingSession,
+                         sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
+        context == .outsideApplication ? [.copy, .generic] : [.copy, .generic]
+    }
+
+    func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint,
+                         operation: NSDragOperation) {
+        let dragged = draggedItems
+        draggedItems = []
+        dragging = false
+        guard operation != [] else { return }
+        MainActor.assumeIsolated { onDragged(dragged) }
+    }
+}
+
+private final class ClosureMenuItem: NSMenuItem {
+    private let handler: () -> Void
+
+    init(title: String, action handler: @escaping () -> Void) {
+        self.handler = handler
+        super.init(title: title, action: #selector(run), keyEquivalent: "")
+        target = self
+    }
+
+    required init(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    @objc private func run() { handler() }
+}
+
+/// Empty space that moves the window, as a title bar would.
+private struct WindowDragArea: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { MoveView() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    private final class MoveView: NSView {
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+        override func mouseDown(with event: NSEvent) { window?.performDrag(with: event) }
+    }
+}

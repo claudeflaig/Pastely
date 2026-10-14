@@ -56,7 +56,7 @@ struct ClipItem: Identifiable, Codable, Equatable {
         case .image:
             return nil
         case .color:
-            return colorHex
+            return text ?? colorHex
         case .file:
             let paths = fileURLs.map { URL(string: $0)?.path ?? $0 }
             return paths.isEmpty ? nil : paths.joined(separator: "\n")
@@ -90,6 +90,30 @@ struct ClipItem: Identifiable, Codable, Equatable {
             .compactMap { $0 }
             .joined(separator: " ")
             .lowercased()
+    }
+
+    /// "#2B3742", "#fff" or "#2B3742CC" alone, normalized to upper case and
+    /// six or eight digits; nil for anything else. The "#" is required, so a
+    /// word like "bad" or a code like "123456" stays text.
+    static func hexColor(in text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("#") else { return nil }
+        let digits = trimmed.dropFirst().uppercased()
+        guard [3, 6, 8].contains(digits.count), digits.allSatisfy(\.isHexDigit) else { return nil }
+        let full = digits.count == 3 ? digits.map { "\($0)\($0)" }.joined() : digits
+        return "#" + full
+    }
+
+    /// A text clip that is only a hex code, as a color clip that shows the
+    /// color. The text stays, so search and plain-text paste are unchanged.
+    func recognizingHexColor() -> ClipItem {
+        guard type == .text || type == .richText, let text, let hex = Self.hexColor(in: text) else { return self }
+        var item = self
+        item.type = .color
+        item.colorHex = hex
+        item.rtfData = nil
+        item.htmlData = nil
+        return item
     }
 
     func sameContent(as other: ClipItem) -> Bool {

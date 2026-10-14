@@ -142,6 +142,7 @@ enum ClipColorTheme: Int, CaseIterable, Identifiable {
     case `default`
     case vibrant
     case accentShades
+    case appIcon
 
     var id: Int { rawValue }
 
@@ -150,6 +151,7 @@ enum ClipColorTheme: Int, CaseIterable, Identifiable {
         case .default: "Default"
         case .vibrant: "Vibrant"
         case .accentShades: "Accent shades"
+        case .appIcon: "App icon"
         }
     }
 
@@ -161,6 +163,8 @@ enum ClipColorTheme: Int, CaseIterable, Identifiable {
             "Give each source app one of Klarglas\u{2019}s bright colors."
         case .accentShades:
             "Give each source app a stable lighter or darker shade of one color."
+        case .appIcon:
+            "Take each card\u{2019}s color from its source app\u{2019}s icon."
         }
     }
 }
@@ -281,7 +285,8 @@ final class Settings {
         static let playSoundOnCopy = "playSoundOnCopy"
         static let playSoundOnCapture = "playSoundOnCapture"
         static let captureSoundName = "captureSoundName"
-        static let showThumbnails = "showThumbnails"
+        static let shelfForClips = "shelfForClips"
+        static let shelfForFolders = "shelfForFolders"
         static let promoteOnPaste = "promoteOnPaste"
         static let ignoreConcealed = "ignoreConcealed"
         static let deletePermanently = "deletePermanently"
@@ -395,9 +400,14 @@ final class Settings {
         didSet { guard isLoaded else { return }; d.set(captureSoundName, forKey: Keys.captureSoundName) }
     }
 
-    /// Small cards in the screen's corner for new clips and new files.
-    var showThumbnails: Bool {
-        didSet { guard isLoaded else { return }; d.set(showThumbnails, forKey: Keys.showThumbnails) }
+    /// Puts each new copy on the Shelf.
+    var shelfForClips: Bool {
+        didSet { guard isLoaded else { return }; d.set(shelfForClips, forKey: Keys.shelfForClips) }
+    }
+
+    /// Puts each file that lands in a folder tab, such as a download, on the Shelf.
+    var shelfForFolders: Bool {
+        didSet { guard isLoaded else { return }; d.set(shelfForFolders, forKey: Keys.shelfForFolders) }
     }
 
     /// The bright, short system sounds that read as "done".
@@ -597,7 +607,8 @@ final class Settings {
             Keys.playSoundOnCopy: false,
             Keys.playSoundOnCapture: true,
             Keys.captureSoundName: "Glass",
-            Keys.showThumbnails: true,
+            Keys.shelfForClips: true,
+            Keys.shelfForFolders: true,
             Keys.promoteOnPaste: false,
             Keys.ignoreConcealed: true,
             Keys.deletePermanently: false,
@@ -608,7 +619,7 @@ final class Settings {
             Keys.onboarded: false,
             Keys.iCloudSync: false,
             Keys.cloudKitSync: true,
-            Keys.clipColorTheme: ClipColorTheme.default.rawValue,
+            Keys.clipColorTheme: ClipColorTheme.appIcon.rawValue,
             Keys.clipColorAccentHex: "#FF5A9F",
             Keys.selectedClipPosition: SelectedClipPosition.center.rawValue,
             Keys.barAppearance: BarAppearance.system.rawValue,
@@ -641,7 +652,8 @@ final class Settings {
         playSoundOnCopy = d.bool(forKey: Keys.playSoundOnCopy)
         playSoundOnCapture = d.bool(forKey: Keys.playSoundOnCapture)
         captureSoundName = d.string(forKey: Keys.captureSoundName) ?? "Glass"
-        showThumbnails = d.bool(forKey: Keys.showThumbnails)
+        shelfForClips = d.bool(forKey: Keys.shelfForClips)
+        shelfForFolders = d.bool(forKey: Keys.shelfForFolders)
         promoteOnPaste = d.bool(forKey: Keys.promoteOnPaste)
         ignoreConcealed = d.bool(forKey: Keys.ignoreConcealed)
         deletePermanently = d.bool(forKey: Keys.deletePermanently)

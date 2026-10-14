@@ -59,7 +59,7 @@ struct PinboardArchive: Codable, Equatable {
                             customTitle: item.title,
                             abbreviation: item.abbreviation,
                             createdAt: item.createdAt ?? Date())
-        return (clip, item.imagePNG)
+        return (clip.recognizingHexColor(), item.imagePNG)
     }
 }
 

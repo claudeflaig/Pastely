@@ -53,7 +53,9 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         HotKeyCenter.shared.onTrigger = { [weak self] in self?.toggleBar() }
         HotKeyCenter.shared.onStackTrigger = { PasteStack.shared.toggle() }
-        FolderLibrary.shared.onNewFile = { ThumbnailShelf.shared.show($0) }
+        FolderLibrary.shared.onNewFile = { item in
+            if Settings.shared.shelfForFolders { Shelf.shared.add(item) }
+        }
         FolderLibrary.shared.syncWatchers()
         #if !MAS
         HotKeyCenter.shared.onPlainTextTrigger = { [weak self] in

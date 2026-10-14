@@ -39,7 +39,7 @@ final class ClipboardMonitor {
         ClipboardStore.shared.addCaptured(item)
         PasteStack.shared.capture(item)
         if Settings.shared.playSoundOnCapture { Self.playCaptureSound() }
-        ThumbnailShelf.shared.show(item)
+        if Settings.shared.shelfForClips { Shelf.shared.add(item) }
     }
 
     /// Quiet, so it confirms a copy without getting in the way.
@@ -129,7 +129,7 @@ final class ClipboardMonitor {
             } else {
                 type = .text
             }
-            var item = ClipItem(type: type, text: string, rtfData: rtf, htmlData: html)
+            var item = ClipItem(type: type, text: string, rtfData: rtf, htmlData: html).recognizingHexColor()
             decorate(&item)
             return item
         }

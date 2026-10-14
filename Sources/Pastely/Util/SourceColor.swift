@@ -51,7 +51,23 @@ enum SourceColor {
                 for: bundleID?.isEmpty == false ? bundleID! : "unknown",
                 accentHex: Settings.shared.clipColorAccentHex
             )
+        case .appIcon:
+            return iconColor(for: bundleID)
         }
+    }
+
+    private static var iconColors: [String: Color] = [:]
+
+    /// An icon without a color of its own, such as Terminal's, gets slate.
+    private static let neutralIconColor = Color(red: 0.36, green: 0.39, blue: 0.44)
+
+    private static func iconColor(for bundleID: String?) -> Color {
+        let key = bundleID ?? ""
+        if let cached = iconColors[key] { return cached }
+        let color = IconColor.of(AppIconProvider.icon(forBundleID: bundleID))
+            .map { Color(nsColor: $0) } ?? neutralIconColor
+        iconColors[key] = color
+        return color
     }
 
     /// The ten deterministic shades for a given accent color, used by

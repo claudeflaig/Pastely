@@ -20,3 +20,27 @@ final class ClipItemTests: XCTestCase {
         XCTAssertEqual(decoded.displayTitle, "Example")
     }
 }
+
+final class HexColorRecognitionTests: XCTestCase {
+    func testRecognizesHexCodesWithHash() {
+        XCTAssertEqual(ClipItem.hexColor(in: "#CEDCDE"), "#CEDCDE")
+        XCTAssertEqual(ClipItem.hexColor(in: " #2b3742\n"), "#2B3742")
+        XCTAssertEqual(ClipItem.hexColor(in: "#fa0"), "#FFAA00")
+        XCTAssertEqual(ClipItem.hexColor(in: "#2B3742CC"), "#2B3742CC")
+    }
+
+    func testLeavesOtherTextAlone() {
+        XCTAssertNil(ClipItem.hexColor(in: "bad"))
+        XCTAssertNil(ClipItem.hexColor(in: "123456"))
+        XCTAssertNil(ClipItem.hexColor(in: "#GGGGGG"))
+        XCTAssertNil(ClipItem.hexColor(in: "Farbe #2B3742"))
+    }
+
+    func testTextClipBecomesColorClipAndKeepsItsText() {
+        let clip = ClipItem(type: .text, text: "#D78B60").recognizingHexColor()
+        XCTAssertEqual(clip.type, .color)
+        XCTAssertEqual(clip.colorHex, "#D78B60")
+        XCTAssertEqual(clip.plainText, "#D78B60")
+        XCTAssertEqual(ClipItem(type: .text, text: "Hallo").recognizingHexColor().type, .text)
+    }
+}

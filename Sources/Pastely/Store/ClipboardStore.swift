@@ -851,8 +851,13 @@ final class ClipboardStore {
     private func load() {
         guard let data = try? Data(contentsOf: storeURL),
               let snap = try? JSONDecoder().decode(Snapshot.self, from: data) else { return }
-        history = snap.history
-        pinboards = snap.pinboards
+        // Hex codes saved as text before colors were recognized in text.
+        history = snap.history.map { $0.recognizingHexColor() }
+        pinboards = snap.pinboards.map { board in
+            var board = board
+            board.items = board.items.map { $0.recognizingHexColor() }
+            return board
+        }
         groups = snap.groups ?? []
         selectFirst()
     }

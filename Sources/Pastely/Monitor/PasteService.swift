@@ -81,7 +81,8 @@ enum PasteService {
         case .color:
             if let hex = item.colorHex, let c = NSColor(hex: hex) {
                 pasteboard.writeObjects([c])
-                pasteboard.setString(hex, forType: .string)
+                // A hex code copied as text pastes back exactly as it was typed.
+                pasteboard.setString(item.text ?? hex, forType: .string)
             }
         case .richText:
             if let rtf = item.rtfData { pasteboard.setData(rtf, forType: .rtf) }
