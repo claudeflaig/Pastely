@@ -41,6 +41,27 @@ Ohne Zertifikat signiert das Build-Skript Pastely „ad hoc“. macOS hält dann
 3. `bash scripts/build_app.sh` erneut ausführen. Fragt macOS, ob `codesign` den Schlüssel verwenden darf: **Always Allow**.
 4. Die Freigaben ein letztes Mal erteilen. Ab dann bleiben sie bei jedem Neubau erhalten.
 
+## An Freunde weitergeben
+
+Das eigene Zertifikat gilt nur auf diesem Mac. Für andere Macs signiert `scripts/release.sh` mit einer Developer ID, lässt Apple die App prüfen (Notarisierung) und legt `packaging/Pastely-<Version>.dmg` ab. Diese Datei öffnet sich überall ohne Warnung.
+
+Einmalig einrichten (braucht die Mitgliedschaft im Apple Developer Program):
+
+1. **Xcode → Settings → Accounts** → Apple-ID wählen → **Manage Certificates…** → **+** → **Developer ID Application**.
+2. Auf [account.apple.com](https://account.apple.com) unter **Sign-In and Security → App-Specific Passwords** ein Passwort für „Pastely Notarisierung“ erzeugen.
+3. Die Zugangsdaten im Schlüsselbund speichern (fragt nach dem Passwort aus Schritt 2):
+   ```bash
+   xcrun notarytool store-credentials pastely-notary --apple-id DEINE_APPLE_ID --team-id B9A464EMSV
+   ```
+
+Danach für jede Version:
+
+```bash
+VERSION=1.0.1 BUILD=2 bash scripts/release.sh
+```
+
+Bei den Freunden: DMG öffnen, Pastely in **Applications** ziehen, starten und unter **System Settings → Privacy & Security → Accessibility** erlauben. Updates gibt es nur so, wie man sie verschickt: eine neue DMG, die die alte App ersetzt.
+
 ## Tests
 
 ```bash

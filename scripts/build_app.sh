@@ -36,10 +36,22 @@ printf 'APPL????' > "$APP/Contents/PkgInfo"
 # its Accessibility, Full Disk Access and folder permissions. Without it the
 # bundle is signed ad hoc, and those permissions must be granted again after
 # each build.
+#
+# SIGN_IDENTITY may also be a prefix such as "Developer ID Application";
+# scripts/release.sh uses that, with HARDENED_RUNTIME=1, for builds that
+# Apple notarizes and other Macs open without a warning.
 IDENTITY="${SIGN_IDENTITY:-Pastely Developer}"
-if security find-identity -p codesigning 2>/dev/null | grep -q "\"$IDENTITY\""; then
+SIGN_FLAGS=()
+if [[ "${HARDENED_RUNTIME:-0}" == 1 ]]; then
+  SIGN_FLAGS=(--options runtime --timestamp)
+fi
+if security find-identity -p codesigning 2>/dev/null | grep -q "\"$IDENTITY"; then
   echo "==> Signing $APP with \"$IDENTITY\""
-  /usr/bin/codesign --force --sign "$IDENTITY" --identifier ch.claudeflaig.pastely "$APP"
+  /usr/bin/codesign --force --sign "$IDENTITY" ${SIGN_FLAGS[@]+"${SIGN_FLAGS[@]}"} \
+    --identifier ch.claudeflaig.pastely "$APP"
+elif [[ "${REQUIRE_IDENTITY:-0}" == 1 ]]; then
+  echo "error: no \"$IDENTITY\" certificate in the keychain" >&2
+  exit 1
 else
   echo "==> Signing $APP ad hoc (no \"$IDENTITY\" certificate found)"
   /usr/bin/codesign --force --sign - --identifier ch.claudeflaig.pastely \
