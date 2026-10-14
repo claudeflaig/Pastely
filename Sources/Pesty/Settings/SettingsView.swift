@@ -149,6 +149,25 @@ private struct GeneralSettings: View {
                 #endif
             }
 
+            Section("Appearance") {
+                Picker("Theme", selection: $settings.barAppearance) {
+                    ForEach(BarAppearance.allCases) { appearance in
+                        Text(appearance.title).tag(appearance)
+                    }
+                }
+                .pickerStyle(.segmented)
+                Picker("Show the bar at the", selection: $settings.barEdge) {
+                    ForEach(BarEdge.allCases) { edge in
+                        Text(edge.title).tag(edge)
+                    }
+                }
+                .pickerStyle(.segmented)
+                Toggle("Show link previews", isOn: $settings.linkPreviews)
+                Text("Link previews load the page's title and image from the site when a link is first shown.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Clip Colors") {
                 Picker("Color theme", selection: $settings.clipColorTheme) {
                     ForEach(ClipColorTheme.allCases) { theme in

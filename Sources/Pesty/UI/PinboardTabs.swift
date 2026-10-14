@@ -2,10 +2,12 @@ import SwiftUI
 
 struct PinboardTabs: View {
     @Bindable private var store = ClipboardStore.shared
+    /// The tab a card is being dragged over, highlighted as a drop target.
+    @State private var dropTarget: UUID?
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            HStack(spacing: 14) {
                 pill(title: "Clipboard",
                      dot: nil,
                      icon: "clock",
@@ -16,14 +18,38 @@ struct PinboardTabs: View {
                 ForEach(store.pinboards) { board in
                     pill(title: board.name,
                          dot: board.color,
-                         selected: store.source == .pinboard(board.id)) {
+                         selected: store.source == .pinboard(board.id) || dropTarget == board.id) {
                         store.source = .pinboard(board.id); store.selectFirst()
+                    }
+                    // Dropping a card on a tab saves it there, as in Paste.
+                    .onDrop(of: [.item], isTargeted: Binding(
+                        get: { dropTarget == board.id },
+                        set: { dropTarget = $0 ? board.id : (dropTarget == board.id ? nil : dropTarget) }
+                    )) { _ in
+                        guard let item = ClipDragProvider.recentlyDraggedItem else { return false }
+                        ClipDragProvider.clearDraggedItem()
+                        store.saveToPinboard(item, boardID: board.id)
+                        return true
                     }
                     // Rename lived only in the context menu, which nobody found (#100).
                     .simultaneousGesture(TapGesture(count: 2).onEnded { rename(board) })
                     .help("Double-click or right-click to rename")
                     .contextMenu {
                         Button("Rename…") { rename(board) }
+                        Menu("Color") {
+                            ForEach(ClipboardStore.pinboardColors, id: \.self) { hex in
+                                Button {
+                                    store.recolorPinboard(board.id, to: hex)
+                                } label: {
+                                    Label {
+                                        Text(Self.colorName(hex))
+                                    } icon: {
+                                        Image(nsImage: Self.dot(hex))
+                                    }
+                                }
+                            }
+                        }
+                        Divider()
                         Button("Delete Pinboard", role: .destructive) {
                             store.deletePinboard(board.id)
                         }
@@ -32,10 +58,9 @@ struct PinboardTabs: View {
 
                 Button(action: addPinboard) {
                     Image(systemName: "plus")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(size: 15, weight: .regular))
                         .foregroundStyle(Theme.chromeTextSecondary)
                         .frame(width: 26, height: 26)
-                        .background(Theme.fieldBG, in: Circle())
                 }
                 .buttonStyle(.plain)
                 .help("New Pinboard")
@@ -46,26 +71,42 @@ struct PinboardTabs: View {
     private func pill(title: String, dot: Color?, icon: String? = nil,
                       selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 if let icon {
                     Image(systemName: icon)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                 }
                 if let dot {
-                    Circle().fill(dot).frame(width: 7, height: 7)
+                    Circle().fill(dot).frame(width: 11, height: 11)
                 }
                 Text(title)
-                    .font(.system(size: 12.5, weight: .medium))
+                    .font(.system(size: 14, weight: selected ? .semibold : .regular))
                     .lineLimit(1)
             }
             .foregroundStyle(selected ? Theme.chromeTextPrimary : Theme.chromeTextSecondary)
             .padding(.horizontal, 12)
-            .frame(height: 29)
+            .frame(height: 30)
             .background(selected ? Theme.pillSelected : Theme.pillBG, in: Capsule())
         }
         .buttonStyle(.plain)
         .fixedSize()
         .animation(.easeOut(duration: 0.15), value: selected)
+    }
+
+    private static func colorName(_ hex: String) -> String {
+        ["#FF5F57": "Red", "#FEBC2E": "Yellow", "#28C840": "Green", "#2F80ED": "Blue",
+         "#A259FF": "Purple", "#FF8A00": "Orange", "#FF4FA0": "Pink", "#19B5C6": "Teal"][hex] ?? hex
+    }
+
+    /// Menus drop SwiftUI shapes, so the swatch is drawn as an image.
+    private static func dot(_ hex: String) -> NSImage {
+        let image = NSImage(size: NSSize(width: 12, height: 12), flipped: false) { rect in
+            (NSColor(hex: hex) ?? .gray).setFill()
+            NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1)).fill()
+            return true
+        }
+        image.isTemplate = false
+        return image
     }
 
     private func addPinboard() {

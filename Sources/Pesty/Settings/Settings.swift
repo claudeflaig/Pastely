@@ -186,6 +186,45 @@ enum SelectedClipPosition: Int, CaseIterable, Identifiable {
     }
 }
 
+enum BarAppearance: Int, CaseIterable, Identifiable {
+    case system
+    case light
+    case dark
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .system: "Match System"
+        case .light: "Light"
+        case .dark: "Dark"
+        }
+    }
+
+    /// nil lets the bar follow the system appearance.
+    var nsAppearance: NSAppearance? {
+        switch self {
+        case .system: nil
+        case .light: NSAppearance(named: .aqua)
+        case .dark: NSAppearance(named: .darkAqua)
+        }
+    }
+}
+
+enum BarEdge: Int, CaseIterable, Identifiable {
+    case bottom
+    case top
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .bottom: "Bottom"
+        case .top: "Top"
+        }
+    }
+}
+
 @Observable
 @MainActor
 final class Settings {
@@ -220,6 +259,9 @@ final class Settings {
         static let clipColorTheme = "clipColorTheme"
         static let clipColorAccentHex = "clipColorAccentHex"
         static let selectedClipPosition = "selectedClipPosition"
+        static let barAppearance = "barAppearance"
+        static let barEdge = "barEdge"
+        static let linkPreviews = "linkPreviews"
     }
 
     var historyLimit: Int {
@@ -368,6 +410,19 @@ final class Settings {
         didSet { guard isLoaded else { return }; d.set(selectedClipPosition.rawValue, forKey: Keys.selectedClipPosition) }
     }
 
+    var barAppearance: BarAppearance {
+        didSet { guard isLoaded else { return }; d.set(barAppearance.rawValue, forKey: Keys.barAppearance) }
+    }
+
+    var barEdge: BarEdge {
+        didSet { guard isLoaded else { return }; d.set(barEdge.rawValue, forKey: Keys.barEdge) }
+    }
+
+    /// Fetching a preview contacts the link's site, so it can be turned off.
+    var linkPreviews: Bool {
+        didSet { guard isLoaded else { return }; d.set(linkPreviews, forKey: Keys.linkPreviews) }
+    }
+
     private init() {
         d.register(defaults: [
             Keys.historyLimit: 500,
@@ -396,7 +451,10 @@ final class Settings {
             Keys.cloudKitSync: true,
             Keys.clipColorTheme: ClipColorTheme.default.rawValue,
             Keys.clipColorAccentHex: "#FF5A9F",
-            Keys.selectedClipPosition: SelectedClipPosition.center.rawValue
+            Keys.selectedClipPosition: SelectedClipPosition.center.rawValue,
+            Keys.barAppearance: BarAppearance.system.rawValue,
+            Keys.barEdge: BarEdge.bottom.rawValue,
+            Keys.linkPreviews: true
         ])
         historyLimit = d.integer(forKey: Keys.historyLimit)
         historyRetentionMode = HistoryRetentionMode(rawValue: d.string(forKey: Keys.historyRetentionMode) ?? "")
@@ -427,6 +485,9 @@ final class Settings {
         clipColorTheme = ClipColorTheme(rawValue: d.integer(forKey: Keys.clipColorTheme)) ?? .default
         clipColorAccentHex = d.string(forKey: Keys.clipColorAccentHex) ?? "#FF5A9F"
         selectedClipPosition = SelectedClipPosition(rawValue: d.integer(forKey: Keys.selectedClipPosition)) ?? .center
+        barAppearance = BarAppearance(rawValue: d.integer(forKey: Keys.barAppearance)) ?? .system
+        barEdge = BarEdge(rawValue: d.integer(forKey: Keys.barEdge)) ?? .bottom
+        linkPreviews = d.bool(forKey: Keys.linkPreviews)
         isLoaded = true
         if normalizedBarHeight != storedBarHeight {
             d.set(normalizedBarHeight, forKey: Keys.barHeight)

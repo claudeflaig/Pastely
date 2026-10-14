@@ -5,6 +5,8 @@ struct BarView: View {
     @Bindable private var store = ClipboardStore.shared
     @Bindable private var settings = Settings.shared
 
+    private var topDocked: Bool { settings.barEdge == .top }
+
     private var searchIsActive: Bool {
         store.barInputMode == .search || !store.searchText.isEmpty
     }
@@ -26,7 +28,7 @@ struct BarView: View {
                 strip
             }
         }
-        .overlay(alignment: .top) {
+        .overlay(alignment: topDocked ? .bottom : .top) {
             if settings.showBarResizeHandle {
                 BarResizeHandle(
                     accessibilityValue: CGFloat(settings.barHeight),
@@ -37,7 +39,9 @@ struct BarView: View {
                     onAccessibilityAdjustment: AppController.shared.adjustBarHeight)
             }
         }
-        .clipShape(RoundedCorners(radius: Theme.cornerRadius, corners: [.topLeft, .topRight]))
+        // Only the corners facing into the screen are rounded.
+        .clipShape(RoundedCorners(radius: Theme.cornerRadius,
+                                  corners: topDocked ? [.bottomLeft, .bottomRight] : [.topLeft, .topRight]))
         .ignoresSafeArea()
     }
 
@@ -46,7 +50,7 @@ struct BarView: View {
         if #available(macOS 26.0, *) {
             Color.clear
         } else {
-            VisualEffectView(material: .hudWindow)
+            VisualEffectView(material: .popover)
             Theme.panelTint
         }
     }

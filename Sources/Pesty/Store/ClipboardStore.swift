@@ -367,9 +367,14 @@ final class ClipboardStore {
         refreshUndoState()
     }
 
+    /// Paste's pinboard dot colors, handed out in turn to new boards.
+    static let pinboardColors = ["#FF5F57", "#FEBC2E", "#28C840", "#2F80ED",
+                                 "#A259FF", "#FF8A00", "#FF4FA0", "#19B5C6"]
+
     @discardableResult
-    func addPinboard(name: String, colorHex: String = "#5B8DEF") -> Pinboard {
-        let b = Pinboard(name: name, colorHex: colorHex)
+    func addPinboard(name: String, colorHex: String? = nil) -> Pinboard {
+        let next = Self.pinboardColors[pinboards.count % Self.pinboardColors.count]
+        let b = Pinboard(name: name, colorHex: colorHex ?? next)
         pinboards.append(b)
         scheduleSave()
         return b
@@ -378,6 +383,12 @@ final class ClipboardStore {
     func renamePinboard(_ id: UUID, to name: String) {
         guard let i = pinboards.firstIndex(where: { $0.id == id }) else { return }
         pinboards[i].name = name
+        scheduleSave()
+    }
+
+    func recolorPinboard(_ id: UUID, to colorHex: String) {
+        guard let i = pinboards.firstIndex(where: { $0.id == id }) else { return }
+        pinboards[i].colorHex = colorHex
         scheduleSave()
     }
 

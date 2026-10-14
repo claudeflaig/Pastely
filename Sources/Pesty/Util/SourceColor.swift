@@ -3,19 +3,20 @@ import SwiftUI
 
 @MainActor
 enum SourceColor {
+    // Paste's saturated header colors.
     private static let palette: [Color] = [
-        Color(red: 0.85, green: 0.66, blue: 0.22),
-        Color(red: 0.34, green: 0.56, blue: 0.82),
-        Color(red: 0.72, green: 0.38, blue: 0.58),
-        Color(red: 0.27, green: 0.62, blue: 0.55),
-        Color(red: 0.80, green: 0.40, blue: 0.34),
-        Color(red: 0.45, green: 0.40, blue: 0.74),
-        Color(red: 0.49, green: 0.62, blue: 0.30),
-        Color(red: 0.84, green: 0.52, blue: 0.27),
-        Color(red: 0.30, green: 0.49, blue: 0.74),
-        Color(red: 0.62, green: 0.42, blue: 0.30),
-        Color(red: 0.74, green: 0.36, blue: 0.42),
-        Color(red: 0.40, green: 0.55, blue: 0.62)
+        Color(red: 0.98, green: 0.71, blue: 0.04),
+        Color(red: 0.21, green: 0.55, blue: 0.98),
+        Color(red: 0.96, green: 0.33, blue: 0.42),
+        Color(red: 0.30, green: 0.79, blue: 0.40),
+        Color(red: 0.99, green: 0.56, blue: 0.16),
+        Color(red: 0.62, green: 0.41, blue: 0.93),
+        Color(red: 0.13, green: 0.71, blue: 0.80),
+        Color(red: 0.93, green: 0.30, blue: 0.29),
+        Color(red: 0.36, green: 0.43, blue: 0.91),
+        Color(red: 0.73, green: 0.53, blue: 0.36),
+        Color(red: 0.91, green: 0.36, blue: 0.71),
+        Color(red: 0.45, green: 0.59, blue: 0.71)
     ]
 
     private static let key = "appColorMap"

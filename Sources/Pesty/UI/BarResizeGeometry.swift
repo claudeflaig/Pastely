@@ -25,29 +25,37 @@ enum BarResizeGeometry {
         return min(CGFloat(normalizedPersistedHeight(requestedHeight)), displayHeight)
     }
 
-    /// Produces the complete bottom-docked panel frame for a target display.
+    /// Produces the complete panel frame, docked to the bottom or top edge of
+    /// a target display.
     static func panelFrame(
         for requestedHeight: Double,
-        in visibleFrame: CGRect
+        in visibleFrame: CGRect,
+        topDocked: Bool = false
     ) -> CGRect {
+        dockedFrame(height: effectiveHeight(for: requestedHeight, in: visibleFrame),
+                    in: visibleFrame, topDocked: topDocked)
+    }
+
+    static func dockedFrame(height: CGFloat, in visibleFrame: CGRect, topDocked: Bool) -> CGRect {
         CGRect(
             x: visibleFrame.minX,
-            y: visibleFrame.minY,
+            y: topDocked ? visibleFrame.maxY - height : visibleFrame.minY,
             width: visibleFrame.width,
-            height: effectiveHeight(for: requestedHeight, in: visibleFrame)
+            height: height
         )
     }
 
-    /// The macOS 26 glass surface extends below the panel so its lower corners
-    /// remain clipped. Live resizing must preserve that oversized root view.
+    /// The macOS 26 glass surface extends past the docked edge so the corners
+    /// there remain clipped. Live resizing must preserve that oversized root view.
     static func presentedContentFrame(
         panelSize: CGSize,
-        bottomExtension: CGFloat
+        bottomExtension: CGFloat,
+        topDocked: Bool = false
     ) -> CGRect {
         let extensionHeight = max(0, bottomExtension)
         return CGRect(
             x: 0,
-            y: -extensionHeight,
+            y: topDocked ? 0 : -extensionHeight,
             width: panelSize.width,
             height: panelSize.height + extensionHeight
         )
@@ -60,13 +68,16 @@ struct BarResizeSession: Equatable {
     let initialPanelHeight: CGFloat
     let initialScreenY: CGFloat
     let visibleFrame: CGRect
+    let topDocked: Bool
 
     init(
         initialPanelHeight: CGFloat,
         initialScreenY: CGFloat,
-        visibleFrame: CGRect
+        visibleFrame: CGRect,
+        topDocked: Bool = false
     ) {
         self.visibleFrame = visibleFrame
+        self.topDocked = topDocked
         self.initialPanelHeight = BarResizeGeometry.effectiveHeight(
             for: Double(initialPanelHeight),
             in: visibleFrame
@@ -74,13 +85,14 @@ struct BarResizeSession: Equatable {
         self.initialScreenY = initialScreenY
     }
 
-    /// Global macOS screen coordinates increase upward, so upward pointer
-    /// travel adds to the bar height and downward travel subtracts from it.
+    /// Global macOS screen coordinates increase upward, so for a bottom bar
+    /// upward pointer travel adds to the height; a top bar grows downward.
     func height(atScreenY screenY: CGFloat) -> CGFloat {
         guard initialScreenY.isFinite, screenY.isFinite else {
             return initialPanelHeight
         }
-        let requestedHeight = initialPanelHeight + (screenY - initialScreenY)
+        let travel = screenY - initialScreenY
+        let requestedHeight = initialPanelHeight + (topDocked ? -travel : travel)
         return BarResizeGeometry.effectiveHeight(
             for: Double(requestedHeight),
             in: visibleFrame
@@ -88,12 +100,8 @@ struct BarResizeSession: Equatable {
     }
 
     func frame(atScreenY screenY: CGFloat) -> CGRect {
-        CGRect(
-            x: visibleFrame.minX,
-            y: visibleFrame.minY,
-            width: visibleFrame.width,
-            height: height(atScreenY: screenY)
-        )
+        BarResizeGeometry.dockedFrame(height: height(atScreenY: screenY),
+                                      in: visibleFrame, topDocked: topDocked)
     }
 
     /// The portable value to write only after a successful drag completes.
@@ -106,11 +114,7 @@ struct BarResizeSession: Equatable {
     var cancelledHeight: CGFloat { initialPanelHeight }
 
     var cancelledFrame: CGRect {
-        CGRect(
-            x: visibleFrame.minX,
-            y: visibleFrame.minY,
-            width: visibleFrame.width,
-            height: initialPanelHeight
-        )
+        BarResizeGeometry.dockedFrame(height: initialPanelHeight,
+                                      in: visibleFrame, topDocked: topDocked)
     }
 }

@@ -5,7 +5,20 @@ import UniformTypeIdentifiers
 enum ClipDragProvider {
     private static let colorTypeIdentifier = "com.apple.cocoa.pasteboard.color"
 
+    /// The clip a drag inside the bar started from, so a pinboard tab can save
+    /// it whole instead of rebuilding it from the dragged representations.
+    /// Stamped because SwiftUI reports no drag end to clear it on.
+    private static var dragged: (item: ClipItem, at: Date)?
+
+    static var recentlyDraggedItem: ClipItem? {
+        guard let dragged, -dragged.at.timeIntervalSinceNow < 30 else { return nil }
+        return dragged.item
+    }
+
+    static func clearDraggedItem() { dragged = nil }
+
     static func make(for item: ClipItem) -> NSItemProvider {
+        dragged = (item, Date())
         let provider = NSItemProvider()
         switch item.type {
         case .image:

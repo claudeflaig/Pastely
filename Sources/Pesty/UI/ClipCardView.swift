@@ -11,6 +11,7 @@ struct ClipCardView: View {
     @State private var preview: NSImage?
     @State private var previewFailed = false
     @State private var fileInfo: ClipPreviewProvider.FileInfo?
+    @State private var linkPreview: LinkPreview?
     private var store: ClipboardStore { ClipboardStore.shared }
     private var settings: Settings { Settings.shared }
     private var headerColor: Color { SourceColor.color(for: item.sourceBundleID) }
@@ -37,7 +38,7 @@ struct ClipCardView: View {
                 .strokeBorder(selected ? Theme.selection : Theme.cardBorder,
                               lineWidth: selected ? 1.5 : 1)
         )
-        .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
+        .shadow(color: .black.opacity(0.10), radius: 10, y: 4)
         .scaleEffect(hovering && !selected ? 1.015 : 1.0)
         .zIndex(selected ? 1 : 0)
         .animation(.spring(response: 0.32, dampingFraction: 0.72), value: selected)
@@ -53,26 +54,26 @@ struct ClipCardView: View {
         .task(id: item.id) { await loadPreview() }
     }
 
+    /// Paste's header: type and age on the left, and the source app's icon
+    /// oversized at the right edge so the header clips part of it.
     private var header: some View {
-        ZStack {
+        ZStack(alignment: .leading) {
             headerColor
-            HStack(alignment: .top, spacing: 8) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(cardTypeLabel)
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(Theme.headerText)
-                    Text(item.createdAt.clipRelativeLong)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.headerSubText)
-                }
-                .lineLimit(1)
-                Spacer(minLength: 4)
-                appIconTile
+            VStack(alignment: .leading, spacing: 1) {
+                Text(cardTypeLabel)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Theme.headerText)
+                Text(item.createdAt.clipRelativeLong)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(Theme.headerSubText)
             }
-            .padding(.horizontal, 13)
-            .padding(.vertical, 7)
+            .lineLimit(1)
+            .padding(.leading, 14)
+            .padding(.trailing, Theme.appIconSize - 4)
         }
+        .overlay(alignment: .trailing) { appIconTile }
         .frame(height: Theme.headerHeight)
+        .clipped()
     }
 
     private var cardTypeLabel: String {
@@ -81,33 +82,45 @@ struct ClipCardView: View {
     }
 
     private var appIconTile: some View {
-        RoundedRectangle(cornerRadius: 15, style: .continuous)
-            .fill(Color.white.opacity(0.14))
-            .overlay(
-                RoundedRectangle(cornerRadius: 15, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.14))
-            )
-            .frame(width: 56, height: 56)
-            .overlay(
-                Image(nsImage: AppIconProvider.icon(forBundleID: item.sourceBundleID))
-                    .resizable()
-                    .interpolation(.high)
-                    .frame(width: 48, height: 48)
-            )
+        Image(nsImage: AppIconProvider.icon(forBundleID: item.sourceBundleID))
+            .resizable()
+            .interpolation(.high)
+            .frame(width: Theme.appIconSize, height: Theme.appIconSize)
+            .shadow(color: .black.opacity(0.15), radius: 3, y: 1)
+            .offset(x: 10, y: -4)
     }
 
     private var body_: some View {
         VStack(alignment: .leading, spacing: 0) {
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(.horizontal, showsImage ? 0 : 13)
-                .padding(.top, showsImage ? 0 : 11)
-            footer
-                .padding(.horizontal, 13)
-                .padding(.bottom, 10)
+                .padding(.horizontal, fillsBody ? 0 : 16)
+                .padding(.top, fillsBody ? 0 : 14)
+            if !showsImage {
+                footer
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay(alignment: .bottom) {
+            // Paste floats an image's size on a dark pill over the picture.
+            if showsImage {
+                Text(metaLeft)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .lineLimit(1)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(.black.opacity(0.45), in: Capsule())
+                    .padding(.bottom, 10)
+            }
+        }
         .background(Theme.cardBody)
+    }
+
+    private var fillsBody: Bool {
+        showsImage || (item.type == .link && showsLinkHero)
     }
 
     /// Image clips, and file clips pointing at an image, which is how a copied
@@ -136,20 +149,50 @@ struct ClipCardView: View {
                 fileContent
             }
         case .link:
-            VStack(spacing: 10) {
-                Spacer(minLength: 0)
-                Image(systemName: "safari").font(.system(size: 34, weight: .light))
-                    .foregroundStyle(Theme.cardTextTertiary)
-                Spacer(minLength: 0)
-            }
-            .frame(maxWidth: .infinity)
+            linkContent
         default:
             Text(item.text ?? "")
-                .font(.system(size: 12.5))
-                .foregroundStyle(Theme.cardTextPrimary.opacity(0.9))
+                .font(.system(size: 13.5))
+                .lineSpacing(2)
+                .foregroundStyle(Theme.cardTextPrimary)
                 .lineLimit(10)
                 .multilineTextAlignment(.leading)
         }
+    }
+
+    /// A page's hero image fills the card above its title, as in Paste. A site
+    /// that only offers a favicon gets it centered instead of stretched.
+    @ViewBuilder
+    private var linkContent: some View {
+        if let image = linkPreview?.image, showsLinkHero {
+            // Fit to the card's width, so a wide social image keeps its
+            // text readable instead of being cropped at the sides.
+            Image(nsImage: image)
+                .resizable().interpolation(.medium).scaledToFit()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .clipped()
+        } else {
+            VStack {
+                Spacer(minLength: 0)
+                if let icon = linkPreview?.image {
+                    Image(nsImage: icon)
+                        .resizable().interpolation(.high).scaledToFit()
+                        .frame(width: 56, height: 56)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                } else {
+                    Image(systemName: "safari").font(.system(size: 34, weight: .light))
+                        .foregroundStyle(Theme.cardTextTertiary)
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    /// Wide enough to be a page image rather than an icon.
+    private var showsLinkHero: Bool {
+        guard let size = linkPreview?.image?.size else { return false }
+        return size.width >= 200 && size.width > size.height * 1.1
     }
 
     /// Over a checkerboard, so a transparent cut-out is distinguishable from
@@ -159,7 +202,7 @@ struct ClipCardView: View {
             CheckerboardBackground()
             if let image = preview ?? ClipPreviewProvider.cachedImage(for: item) {
                 Image(nsImage: image)
-                    .resizable().interpolation(.medium).scaledToFit()
+                    .resizable().interpolation(.medium).scaledToFill()
             } else {
                 placeholder("photo")
             }
@@ -193,7 +236,21 @@ struct ClipCardView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    /// The page's own title unless the user renamed the card.
+    private var linkTitle: String {
+        if let custom = item.customTitle, !custom.isEmpty { return custom }
+        if let title = linkPreview?.title, !title.isEmpty { return title }
+        return item.displayTitle
+    }
+
     private func loadPreview() async {
+        if let url = LinkPreviewProvider.url(for: item) {
+            linkPreview = LinkPreviewProvider.cached(for: url)
+            if linkPreview == nil, settings.linkPreviews {
+                linkPreview = await LinkPreviewProvider.preview(for: url)
+            }
+            return
+        }
         preview = ClipPreviewProvider.cachedImage(for: item)
         fileInfo = nil
         previewFailed = false
@@ -214,32 +271,31 @@ struct ClipCardView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    /// Paste centers a single gray line under the content; a link instead
+    /// gets its title over the address, left aligned.
     private var footer: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: item.type == .link ? .leading : .center, spacing: 2) {
             if item.type == .link {
-                Text(item.displayTitle)
-                    .font(.system(size: 12, weight: .semibold))
+                Text(linkTitle)
+                    .font(.system(size: 13.5, weight: .semibold))
                     .foregroundStyle(Theme.cardTextPrimary).lineLimit(1)
             }
-            HStack(alignment: .bottom, spacing: 6) {
-                // A path is worth reading in full, so it wraps rather than
-                // collapsing to an ellipsis; everything else stays one line.
-                Text(metaLeft)
-                    .font(.system(size: 11))
-                    .foregroundStyle(Theme.cardTextSecondary)
-                    .lineLimit(item.type == .file ? 3 : 1)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 4)
-                if index < 9 {
-                    HStack(spacing: 3) {
-                        Text(settings.quickPasteModifierDisplay)
-                            .font(.system(size: 11, weight: .semibold))
-                        Text("\(index + 1)")
-                            .font(.system(size: 11, weight: .semibold))
-                    }
+            // A path is worth reading in full, so it wraps rather than
+            // collapsing to an ellipsis; everything else stays one line.
+            Text(metaLeft)
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.cardTextSecondary)
+                .lineLimit(item.type == .file ? 3 : 1)
+                .multilineTextAlignment(item.type == .link ? .leading : .center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: item.type == .link ? .leading : .center)
+        .overlay(alignment: .bottomTrailing) {
+            // The quick-paste shortcut stays out of the way until hovered.
+            if index < 9, hovering || selected {
+                Text("\(settings.quickPasteModifierDisplay)\(index + 1)")
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Theme.cardTextTertiary)
-                }
             }
         }
         .padding(.top, 8)
