@@ -108,27 +108,31 @@ struct PinboardTabs: View {
         }
     }
 
+    /// A tap gesture rather than a Button: a Button tracks the mouse itself and
+    /// swallows the drag, so `.onDrag` on a tab never started.
     private func pill(title: String, dot: Color?, icon: String? = nil,
                       selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                if let icon {
-                    Image(systemName: icon)
-                        .font(.system(size: 12, weight: .semibold))
-                }
-                if let dot {
-                    Circle().fill(dot).frame(width: 11, height: 11)
-                }
-                Text(title)
-                    .font(.system(size: 14, weight: selected ? .semibold : .regular))
-                    .lineLimit(1)
+        HStack(spacing: 8) {
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .semibold))
             }
-            .foregroundStyle(selected ? Theme.chromeTextPrimary : Theme.chromeTextSecondary)
-            .padding(.horizontal, 12)
-            .frame(height: 30)
-            .background(selected ? Theme.pillSelected : Theme.pillBG, in: Capsule())
+            if let dot {
+                Circle().fill(dot).frame(width: 11, height: 11)
+            }
+            Text(title)
+                .font(.system(size: 14, weight: selected ? .semibold : .regular))
+                .lineLimit(1)
         }
-        .buttonStyle(.plain)
+        .foregroundStyle(selected ? Theme.chromeTextPrimary : Theme.chromeTextSecondary)
+        .padding(.horizontal, 12)
+        .frame(height: 30)
+        .background(selected ? Theme.pillSelected : Theme.pillBG, in: Capsule())
+        .contentShape(Capsule())
+        .onTapGesture(perform: action)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction(.default, action)
         .fixedSize()
         .animation(.easeOut(duration: 0.15), value: selected)
     }
