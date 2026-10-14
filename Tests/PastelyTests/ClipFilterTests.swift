@@ -86,3 +86,12 @@ final class ClipFilterTests: XCTestCase {
         XCTAssertEqual(apps.first?.name, "Safari")
     }
 }
+
+final class TabMemoryTests: XCTestCase {
+    func testRemembersWithinItsWindow() {
+        XCTAssertFalse(TabMemory.never.remembers(after: 0))
+        XCTAssertTrue(TabMemory.always.remembers(after: 1_000_000))
+        XCTAssertTrue(TabMemory.fifteenMinutes.remembers(after: 899))
+        XCTAssertFalse(TabMemory.fifteenMinutes.remembers(after: 901))
+    }
+}

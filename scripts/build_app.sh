@@ -26,12 +26,20 @@ sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD/" \
 
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
-# Explicitly sign the assembled bundle with a stable designated requirement.
-# Without this, each release build only carries Swift's per-binary linker
-# signature (a changing CDHash), which makes macOS ask for Accessibility again.
-echo "==> Signing $APP"
-/usr/bin/codesign --force --sign - --identifier ch.claudeflaig.pastely \
-  -r='designated => identifier "ch.claudeflaig.pastely"' "$APP"
+# Sign with the "Pastely Developer" certificate when the keychain has one
+# (see README). macOS then recognises every rebuild as the same app and keeps
+# its Accessibility, Full Disk Access and folder permissions. Without it the
+# bundle is signed ad hoc, and those permissions must be granted again after
+# each build.
+IDENTITY="${SIGN_IDENTITY:-Pastely Developer}"
+if security find-identity -p codesigning 2>/dev/null | grep -q "\"$IDENTITY\""; then
+  echo "==> Signing $APP with \"$IDENTITY\""
+  /usr/bin/codesign --force --sign "$IDENTITY" --identifier ch.claudeflaig.pastely "$APP"
+else
+  echo "==> Signing $APP ad hoc (no \"$IDENTITY\" certificate found)"
+  /usr/bin/codesign --force --sign - --identifier ch.claudeflaig.pastely \
+    -r='designated => identifier "ch.claudeflaig.pastely"' "$APP"
+fi
 
 echo "==> Built $APP"
 /usr/bin/file "$APP/Contents/MacOS/Pastely"

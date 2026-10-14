@@ -348,7 +348,10 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         store.barInputMode = .cards
         store.searchText = ""
         store.filter = ClipFilter()
-        store.source = .history
+        // Reopen on the tab the bar was closed on while that is recent enough.
+        let elapsed = Date().timeIntervalSince(lastBarClose.at)
+        let reopen = Settings.shared.tabMemory.remembers(after: elapsed) ? lastBarClose.source : .history
+        store.source = isAvailable(reopen) ? reopen : .history
         CleanShotLibrary.shared.refresh()
         FolderLibrary.shared.refreshAll()
         ImageTextIndex.index(store.history + store.pinboards.flatMap(\.items) + CleanShotLibrary.shared.items)
@@ -363,7 +366,21 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         startKeyMonitor()
     }
 
+    /// The tab the bar was last closed on, for `Settings.tabMemory`.
+    private var lastBarClose: (source: BarSource, at: Date) = (.history, .distantPast)
+
+    /// A remembered tab may have been deleted or switched off since.
+    private func isAvailable(_ source: BarSource) -> Bool {
+        switch source {
+        case .history: true
+        case .pinboard(let id): store.pinboards.contains { $0.id == id }
+        case .cleanShot: CleanShotLibrary.shared.isAvailable
+        case .folder(let path): FolderLibrary.shared.folders.contains(path)
+        }
+    }
+
     func hideBar() {
+        lastBarClose = (store.source, Date())
         stopKeyMonitor()
         barController?.hide()
     }

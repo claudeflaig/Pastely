@@ -32,6 +32,15 @@ bash scripts/build_app.sh && open packaging/Pastely.app
 
 Damit Pastely direkt in andere Apps einfügen und den Paste Stack weiterschalten kann, braucht es die Berechtigung **Bedienungshilfen**.
 
+### Berechtigungen dauerhaft behalten
+
+Ohne Zertifikat signiert das Build-Skript Pastely „ad hoc“. macOS hält dann jeden Neubau für eine neue App und vergisst die Freigaben (Accessibility, Full Disk Access, Downloads). Ein eigenes Zertifikat behebt das, einmalig:
+
+1. **Keychain Access** öffnen → Menü **Keychain Access → Certificate Assistant → Create a Certificate…**
+2. Name: `Pastely Developer`, Identity Type: **Self Signed Root**, Certificate Type: **Code Signing** → **Create**.
+3. `bash scripts/build_app.sh` erneut ausführen. Fragt macOS, ob `codesign` den Schlüssel verwenden darf: **Always Allow**.
+4. Die Freigaben ein letztes Mal erteilen. Ab dann bleiben sie bei jedem Neubau erhalten.
+
 ## Tests
 
 ```bash

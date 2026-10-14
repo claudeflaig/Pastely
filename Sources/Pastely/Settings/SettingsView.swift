@@ -370,6 +370,14 @@ private struct GeneralSettings: View {
                 #endif
                 SettingsToggle(title: "Move pasted clips to the front", isOn: $settings.promoteOnPaste)
                 SettingsToggle(title: "Hide the bar when clicking outside", isOn: $settings.hideOnClickOutside)
+                SettingsRow(title: "Reopen on the last tab",
+                            detail: "After this long the bar opens on Clipboard again.") {
+                    Picker("", selection: $settings.tabMemory) {
+                        ForEach(TabMemory.allCases) { Text($0.title).tag($0) }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
                 SettingsToggle(title: "Play a sound when pasting", isOn: $settings.playSound)
                 SettingsToggle(title: "Play a sound when copying from Pastely", isOn: $settings.playSoundOnCopy)
                 #if MAS

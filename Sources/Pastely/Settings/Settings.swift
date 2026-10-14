@@ -165,6 +165,39 @@ enum ClipColorTheme: Int, CaseIterable, Identifiable {
     }
 }
 
+/// How long the bar reopens on the tab it was closed on before falling back
+/// to Clipboard.
+enum TabMemory: Int, CaseIterable, Identifiable {
+    case never = 0
+    case oneMinute = 60
+    case fiveMinutes = 300
+    case fifteenMinutes = 900
+    case oneHour = 3600
+    case always = -1
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .never: "Never"
+        case .oneMinute: "For 1 minute"
+        case .fiveMinutes: "For 5 minutes"
+        case .fifteenMinutes: "For 15 minutes"
+        case .oneHour: "For 1 hour"
+        case .always: "Always"
+        }
+    }
+
+    /// Whether a tab left `elapsed` seconds ago is still the one to show.
+    func remembers(after elapsed: TimeInterval) -> Bool {
+        switch self {
+        case .never: false
+        case .always: true
+        default: elapsed <= TimeInterval(rawValue)
+        }
+    }
+}
+
 enum SelectedClipPosition: Int, CaseIterable, Identifiable {
     case center
     case rightEdge
@@ -267,6 +300,7 @@ final class Settings {
         static let pasteStackShortcut = "pasteStackShortcut"
         static let pinnedFolders = "pinnedFolders"
         static let expandAbbreviations = "expandAbbreviations"
+        static let tabMemory = "tabMemory"
         static let pasteStackKeyCode = "pasteStackKeyCode"
         static let pasteStackModifiers = "pasteStackModifiers"
     }
@@ -452,6 +486,10 @@ final class Settings {
         didSet { guard isLoaded else { return }; d.set(pinnedFolders, forKey: Keys.pinnedFolders) }
     }
 
+    var tabMemory: TabMemory {
+        didSet { guard isLoaded else { return }; d.set(tabMemory.rawValue, forKey: Keys.tabMemory) }
+    }
+
     var expandAbbreviations: Bool {
         didSet {
             guard isLoaded else { return }
@@ -519,6 +557,7 @@ final class Settings {
             Keys.pasteStackShortcut: true,
             Keys.pinnedFolders: [Settings.downloadsPath],
             Keys.expandAbbreviations: true,
+            Keys.tabMemory: TabMemory.fifteenMinutes.rawValue,
             Keys.pasteStackKeyCode: kVK_ANSI_C,
             Keys.pasteStackModifiers: cmdKey | shiftKey
         ])
@@ -559,6 +598,7 @@ final class Settings {
         pasteStackShortcut = d.bool(forKey: Keys.pasteStackShortcut)
         pinnedFolders = d.stringArray(forKey: Keys.pinnedFolders) ?? []
         expandAbbreviations = d.bool(forKey: Keys.expandAbbreviations)
+        tabMemory = TabMemory(rawValue: d.integer(forKey: Keys.tabMemory)) ?? .fifteenMinutes
         pasteStackKeyCode = d.integer(forKey: Keys.pasteStackKeyCode)
         pasteStackModifiers = d.integer(forKey: Keys.pasteStackModifiers)
         isLoaded = true
