@@ -6,8 +6,14 @@ final class HotKeyCenter {
     static let shared = HotKeyCenter()
 
     var onTrigger: (() -> Void)?
+    /// Fired by the fixed Paste Stack shortcut, ⇧⌘C as in Paste.
+    var onStackTrigger: (() -> Void)?
+
+    private static let barHotKeyID: UInt32 = 1
+    private static let stackHotKeyID: UInt32 = 2
 
     private var hotKeyRef: EventHotKeyRef?
+    private var stackHotKeyRef: EventHotKeyRef?
     private var handlerRef: EventHandlerRef?
     private let signature: OSType = 0x50535459
 
@@ -16,14 +22,39 @@ final class HotKeyCenter {
     func start() {
         installHandlerIfNeeded()
         reload()
+        reloadStackHotKey()
+    }
+
+    /// ⇧⌘C is also taken by some apps (Finder's Computer, browser inspectors),
+    /// so the Paste Stack shortcut can be turned off in Settings.
+    func reloadStackHotKey() {
+        if let ref = stackHotKeyRef { UnregisterEventHotKey(ref); stackHotKeyRef = nil }
+        guard Settings.shared.pasteStackShortcut else { return }
+        let id = EventHotKeyID(signature: signature, id: Self.stackHotKeyID)
+        var ref: EventHotKeyRef?
+        if RegisterEventHotKey(UInt32(kVK_ANSI_C), UInt32(cmdKey | shiftKey), id,
+                               GetApplicationEventTarget(), 0, &ref) == noErr {
+            stackHotKeyRef = ref
+        }
     }
 
     private func installHandlerIfNeeded() {
         guard handlerRef == nil else { return }
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard),
                                  eventKind: OSType(kEventHotKeyPressed))
-        InstallEventHandler(GetApplicationEventTarget(), { _, _, _ -> OSStatus in
-            DispatchQueue.main.async { HotKeyCenter.shared.onTrigger?() }
+        InstallEventHandler(GetApplicationEventTarget(), { _, event, _ -> OSStatus in
+            var hotKeyID = EventHotKeyID()
+            GetEventParameter(event, EventParamName(kEventParamDirectObject),
+                              EventParamType(typeEventHotKeyID), nil,
+                              MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
+            let id = hotKeyID.id
+            DispatchQueue.main.async {
+                if id == HotKeyCenter.stackHotKeyID {
+                    HotKeyCenter.shared.onStackTrigger?()
+                } else {
+                    HotKeyCenter.shared.onTrigger?()
+                }
+            }
             return noErr
         }, 1, &spec, nil, &handlerRef)
     }
@@ -52,7 +83,7 @@ final class HotKeyCenter {
     }
 
     private func register(keyCode: UInt32, modifiers: UInt32) -> Bool {
-        let id = EventHotKeyID(signature: signature, id: 1)
+        let id = EventHotKeyID(signature: signature, id: Self.barHotKeyID)
         var ref: EventHotKeyRef?
         guard RegisterEventHotKey(keyCode, modifiers, id, GetApplicationEventTarget(), 0, &ref) == noErr
         else { return false }

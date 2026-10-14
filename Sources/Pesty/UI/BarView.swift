@@ -8,7 +8,7 @@ struct BarView: View {
     private var topDocked: Bool { settings.barEdge == .top }
 
     private var searchIsActive: Bool {
-        store.barInputMode == .search || !store.searchText.isEmpty
+        store.barInputMode == .search || !store.searchText.isEmpty || store.filter.isActive
     }
 
     private var searchTextBinding: Binding<String> {
@@ -95,10 +95,16 @@ struct BarView: View {
 
     private var searchIndicator: some View {
         HStack(spacing: searchIsActive ? 6 : 0) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(searchIsActive ? Theme.chromeTextPrimary : Theme.chromeTextSecondary)
-                .accessibilityHidden(true)
+            Button {
+                AppController.shared.beginBarSearch()
+            } label: {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(searchIsActive ? Theme.chromeTextPrimary : Theme.chromeTextSecondary)
+            }
+            .buttonStyle(.plain)
+            .help("Search and filter")
+            .accessibilityLabel("Search")
 
             // Kept mounted even in the compact state: the key monitor can
             // focus it synchronously and return the same first key event, so
@@ -121,6 +127,7 @@ struct BarView: View {
             .accessibilityHidden(!searchIsActive)
 
             if searchIsActive {
+                FilterChips()
                 Button {
                     AppController.shared.clearBarSearch()
                 } label: {

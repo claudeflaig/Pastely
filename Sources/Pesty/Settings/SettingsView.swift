@@ -127,6 +127,13 @@ private struct GeneralSettings: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Paste Stack") {
+                Toggle("Start a Paste Stack with ⇧⌘C", isOn: $settings.pasteStackShortcut)
+                Text("While a stack is open, everything you copy joins it, and each ⌘V pastes the next item in order. Pasting in sequence needs the Accessibility permission. Press ⇧⌘C again to close the stack.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Behavior") {
                 #if !MAS
                 Toggle("Paste directly into the active app", isOn: $settings.pasteDirectly)

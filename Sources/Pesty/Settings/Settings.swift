@@ -264,6 +264,7 @@ final class Settings {
         static let linkPreviews = "linkPreviews"
         static let showCleanShotHistory = "showCleanShotHistory"
         static let hideWhileScreenSharing = "hideWhileScreenSharing"
+        static let pasteStackShortcut = "pasteStackShortcut"
     }
 
     var historyLimit: Int {
@@ -434,6 +435,14 @@ final class Settings {
         didSet { guard isLoaded else { return }; d.set(hideWhileScreenSharing, forKey: Keys.hideWhileScreenSharing) }
     }
 
+    var pasteStackShortcut: Bool {
+        didSet {
+            guard isLoaded else { return }
+            d.set(pasteStackShortcut, forKey: Keys.pasteStackShortcut)
+            HotKeyCenter.shared.reloadStackHotKey()
+        }
+    }
+
     private init() {
         d.register(defaults: [
             Keys.historyLimit: 500,
@@ -467,7 +476,8 @@ final class Settings {
             Keys.barEdge: BarEdge.bottom.rawValue,
             Keys.linkPreviews: true,
             Keys.showCleanShotHistory: true,
-            Keys.hideWhileScreenSharing: false
+            Keys.hideWhileScreenSharing: false,
+            Keys.pasteStackShortcut: true
         ])
         historyLimit = d.integer(forKey: Keys.historyLimit)
         historyRetentionMode = HistoryRetentionMode(rawValue: d.string(forKey: Keys.historyRetentionMode) ?? "")
@@ -503,6 +513,7 @@ final class Settings {
         linkPreviews = d.bool(forKey: Keys.linkPreviews)
         showCleanShotHistory = d.bool(forKey: Keys.showCleanShotHistory)
         hideWhileScreenSharing = d.bool(forKey: Keys.hideWhileScreenSharing)
+        pasteStackShortcut = d.bool(forKey: Keys.pasteStackShortcut)
         isLoaded = true
         if normalizedBarHeight != storedBarHeight {
             d.set(normalizedBarHeight, forKey: Keys.barHeight)

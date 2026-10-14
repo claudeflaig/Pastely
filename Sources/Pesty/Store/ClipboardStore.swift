@@ -37,6 +37,10 @@ final class ClipboardStore {
     var source: BarSource = .history {
         didSet { if source != oldValue { clearMultiSelection() } }
     }
+    /// The search's filter chips; they narrow whichever source is shown.
+    var filter = ClipFilter() {
+        didSet { if filter != oldValue { selectFirst() } }
+    }
     var barInputMode: BarInputMode = .cards
     var searchText: String = "" {
         didSet { if searchText != oldValue { clearMultiSelection() } }
@@ -115,8 +119,10 @@ final class ClipboardStore {
             base = CleanShotLibrary.shared.items
         }
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !q.isEmpty else { return base }
-        return base.filter {
+        let filter = self.filter
+        let filtered = filter.isActive ? base.filter { filter.matches($0) } : base
+        guard !q.isEmpty else { return filtered }
+        return filtered.filter {
             $0.searchableText.contains(q) || (ImageTextIndex.text(for: $0)?.contains(q) ?? false)
         }
     }

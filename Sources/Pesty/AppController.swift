@@ -51,6 +51,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         monitor.start()
 
         HotKeyCenter.shared.onTrigger = { [weak self] in self?.toggleBar() }
+        HotKeyCenter.shared.onStackTrigger = { PasteStack.shared.toggle() }
         HotKeyCenter.shared.start()
 
         setMenuBarIconVisible(Settings.shared.showMenuBarIcon)
@@ -66,7 +67,19 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if CommandLine.arguments.contains("--demo") {
             store.seedDemo()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                self?.showBar()
+                guard let self else { return }
+                // --demo-stack shows a Paste Stack instead of the bar, and
+                // --demo-filter opens the bar with filter chips applied, so
+                // both can be looked at without driving the keyboard.
+                if CommandLine.arguments.contains("--demo-stack") {
+                    PasteStack.shared.open()
+                    for item in self.store.history.prefix(4).reversed() { PasteStack.shared.capture(item) }
+                    return
+                }
+                self.showBar()
+                if CommandLine.arguments.contains("--demo-filter") {
+                    self.store.filter = ClipFilter(kinds: [.text, .link], dateRange: .today)
+                }
             }
             return
         }
@@ -174,6 +187,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let menu = NSMenu()
         menu.addItem(withTitle: "Open Pesty   \(Settings.shared.hotkeyDisplay)",
                      action: #selector(menuOpen), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Paste Stack   ⇧⌘C", action: #selector(menuPasteStack), keyEquivalent: "").target = self
         menu.addItem(.separator())
         menu.addItem(withTitle: "Settings…", action: #selector(menuSettings), keyEquivalent: ",").target = self
         let pause = menu.addItem(withTitle: "Pause Pesty", action: #selector(menuTogglePause), keyEquivalent: "")
@@ -198,6 +212,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     @objc private func menuOpen() { showBar() }
+    @objc private func menuPasteStack() { PasteStack.shared.toggle() }
     @objc private func menuSettings() { showSettings() }
     @objc private func menuClear() { store.clearHistory() }
     @objc private func menuTogglePause() { togglePestyPause() }
@@ -311,6 +326,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         barController?.resignSearch()
         store.barInputMode = .cards
         store.searchText = ""
+        store.filter = ClipFilter()
         store.source = .history
         CleanShotLibrary.shared.refresh()
         ImageTextIndex.index(store.history + store.pinboards.flatMap(\.items) + CleanShotLibrary.shared.items)
@@ -346,10 +362,18 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         store.selectFirst()
     }
 
+    /// Opens the search field from the magnifier, so filters can be picked
+    /// before anything is typed.
+    func beginBarSearch() {
+        store.barInputMode = .search
+        _ = barController?.focusSearchAtEnd()
+    }
+
     func clearBarSearch() {
-        let hadQuery = !store.searchText.isEmpty
+        let hadQuery = !store.searchText.isEmpty || store.filter.isActive
         barController?.resignSearch()
         store.searchText = ""
+        store.filter = ClipFilter()
         store.barInputMode = .cards
         if hadQuery { store.selectFirst(); searchClearedAt = Date() }
     }
