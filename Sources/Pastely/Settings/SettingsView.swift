@@ -379,6 +379,17 @@ private struct GeneralSettings: View {
                     .fixedSize()
                 }
                 SettingsToggle(title: "Play a sound when a copy reaches Pastely", isOn: $settings.playSoundOnCapture)
+                SettingsRow(title: "Sound") {
+                    Picker("", selection: $settings.captureSoundName) {
+                        ForEach(Settings.captureSoundChoices, id: \.self) { Text($0).tag($0) }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                    .disabled(!settings.playSoundOnCapture)
+                    .onChange(of: settings.captureSoundName) { _, name in
+                        ClipboardMonitor.playCaptureSound(named: name)
+                    }
+                }
                 SettingsToggle(title: "Play a sound when pasting", isOn: $settings.playSound)
                 SettingsToggle(title: "Play a sound when copying from Pastely", isOn: $settings.playSoundOnCopy)
                 #if MAS

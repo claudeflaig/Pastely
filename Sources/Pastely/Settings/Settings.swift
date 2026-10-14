@@ -280,6 +280,7 @@ final class Settings {
         static let playSound = "playSound"
         static let playSoundOnCopy = "playSoundOnCopy"
         static let playSoundOnCapture = "playSoundOnCapture"
+        static let captureSoundName = "captureSoundName"
         static let promoteOnPaste = "promoteOnPaste"
         static let ignoreConcealed = "ignoreConcealed"
         static let deletePermanently = "deletePermanently"
@@ -387,6 +388,14 @@ final class Settings {
     var playSoundOnCapture: Bool {
         didSet { guard isLoaded else { return }; d.set(playSoundOnCapture, forKey: Keys.playSoundOnCapture) }
     }
+
+    /// A macOS system sound, see `captureSoundChoices`.
+    var captureSoundName: String {
+        didSet { guard isLoaded else { return }; d.set(captureSoundName, forKey: Keys.captureSoundName) }
+    }
+
+    /// The bright, short system sounds that read as "done".
+    static let captureSoundChoices = ["Glass", "Hero", "Ping", "Pop", "Bottle", "Purr"]
 
     /// Pasting a clip moves it to the front of history the way copying it
     /// from the bar does. Off by default: history has always been ordered by
@@ -581,6 +590,7 @@ final class Settings {
             // shouldn't gain a new audible behavior from an update.
             Keys.playSoundOnCopy: false,
             Keys.playSoundOnCapture: true,
+            Keys.captureSoundName: "Glass",
             Keys.promoteOnPaste: false,
             Keys.ignoreConcealed: true,
             Keys.deletePermanently: false,
@@ -623,6 +633,7 @@ final class Settings {
         playSound = d.bool(forKey: Keys.playSound)
         playSoundOnCopy = d.bool(forKey: Keys.playSoundOnCopy)
         playSoundOnCapture = d.bool(forKey: Keys.playSoundOnCapture)
+        captureSoundName = d.string(forKey: Keys.captureSoundName) ?? "Glass"
         promoteOnPaste = d.bool(forKey: Keys.promoteOnPaste)
         ignoreConcealed = d.bool(forKey: Keys.ignoreConcealed)
         deletePermanently = d.bool(forKey: Keys.deletePermanently)
