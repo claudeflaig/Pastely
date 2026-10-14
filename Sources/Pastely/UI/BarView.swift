@@ -25,8 +25,13 @@ struct BarView: View {
         .overlay(alignment: .top) {
             VStack(spacing: 0) {
                 topBar
+                if let group = store.group(for: store.source) {
+                    PinboardGroupRow(group: group)
+                        .transition(.opacity)
+                }
                 strip
             }
+            .animation(.easeOut(duration: 0.15), value: store.group(for: store.source)?.id)
         }
         .overlay(alignment: topDocked ? .bottom : .top) {
             if settings.showBarResizeHandle {

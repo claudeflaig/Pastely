@@ -99,13 +99,6 @@ struct FilterChips: View {
 
     /// Apps found in the source being searched, so every choice has results.
     private var appChoices: [(bundleID: String, name: String)] {
-        let base: [ClipItem]
-        switch store.source {
-        case .history: base = store.history
-        case .pinboard(let id): base = store.pinboards.first { $0.id == id }?.items ?? []
-        case .cleanShot: base = CleanShotLibrary.shared.items
-        case .folder(let path): base = FolderLibrary.shared.items(in: path)
-        }
-        return ClipFilter.apps(in: base)
+        ClipFilter.apps(in: store.items(in: store.source))
     }
 }

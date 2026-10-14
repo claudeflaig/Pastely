@@ -10,6 +10,7 @@ enum TabOrder {
         case .pinboard(let id): "board:\(id.uuidString)"
         case .cleanShot: "cleanshot"
         case .folder(let path): "folder:\(path)"
+        case .group(let id): "group:\(id.uuidString)"
         }
     }
 

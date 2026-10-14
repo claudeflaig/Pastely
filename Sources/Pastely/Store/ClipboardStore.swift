@@ -12,6 +12,8 @@ enum BarSource: Hashable {
     case cleanShot
     /// A folder's contents, such as Downloads, newest first: read-only.
     case folder(String)
+    /// All pinboards in a pinboard folder together.
+    case group(UUID)
 }
 
 /// Whether keyboard focus currently belongs to the native search field or
@@ -30,6 +32,7 @@ final class ClipboardStore {
 
     private(set) var history: [ClipItem] = []
     private(set) var pinboards: [Pinboard] = []
+    private(set) var groups: [PinboardGroup] = []
 
     private var undoStack = ClipUndoStack()
     /// True while a deletion can still be undone; drives the bar's Undo button.
@@ -113,18 +116,24 @@ final class ClipboardStore {
         try? fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: baseDir.path)
     }
 
-    var visibleItems: [ClipItem] {
-        let base: [ClipItem]
+    /// Every clip a tab holds, before search and filters.
+    func items(in source: BarSource) -> [ClipItem] {
         switch source {
         case .history:
-            base = history
+            history
         case .pinboard(let id):
-            base = pinboards.first(where: { $0.id == id })?.items ?? []
+            pinboards.first(where: { $0.id == id })?.items ?? []
         case .cleanShot:
-            base = CleanShotLibrary.shared.items
+            CleanShotLibrary.shared.items
         case .folder(let path):
-            base = FolderLibrary.shared.items(in: path)
+            FolderLibrary.shared.items(in: path)
+        case .group(let id):
+            pinboards(in: id).flatMap(\.items)
         }
+    }
+
+    var visibleItems: [ClipItem] {
+        let base = items(in: source)
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let filter = self.filter
         let filtered = filter.isActive ? base.filter { filter.matches($0) } : base
@@ -272,6 +281,14 @@ final class ClipboardStore {
             guard let boardIndex = pinboards.firstIndex(where: { $0.id == boardID }) else { return }
             placements = Self.placements(of: ids, in: pinboards[boardIndex].items, container: source)
             pinboards[boardIndex].items.removeAll { ids.contains($0.id) }
+        case .group(let groupID):
+            // Each clip goes back to its own pinboard on undo.
+            var found: [ClipPlacement] = []
+            for i in pinboards.indices where pinboards[i].groupID == groupID {
+                found += Self.placements(of: ids, in: pinboards[i].items, container: .pinboard(pinboards[i].id))
+                pinboards[i].items.removeAll { ids.contains($0.id) }
+            }
+            placements = found
         case .cleanShot, .folder:
             // Captures and folder files are owned by CleanShot and Finder.
             return
@@ -336,7 +353,7 @@ final class ClipboardStore {
                     continue
                 }
                 if restore(placement, into: &pinboards[i].items) { restored.append(placement.item.id) }
-            case .cleanShot, .folder:
+            case .cleanShot, .folder, .group:
                 continue
             }
         }
@@ -411,15 +428,24 @@ final class ClipboardStore {
     }
 
     /// The tabs after Clipboard, in the order they were dragged into:
-    /// pinboards, CleanShot and folders. Tab and the arrow keys follow it too.
+    /// pinboards outside folders, pinboard folders, CleanShot and folders
+    /// from Finder. Tab and the arrow keys follow it too.
     var barTabs: [BarSource] {
-        let sources: [BarSource] = pinboards.map { .pinboard($0.id) }
+        let sources: [BarSource] = pinboards.filter { group(of: $0) == nil }.map { .pinboard($0.id) }
+            + groups.map { .group($0.id) }
             + (CleanShotLibrary.shared.isAvailable ? [.cleanShot] : [])
             + FolderLibrary.shared.folders.map { .folder($0) }
         return TabOrder.sorted(sources, by: Settings.shared.tabOrder)
     }
 
+    /// Puts a tab where another top-level tab is. A pinboard dragged out of
+    /// a folder's row leaves the folder.
     func moveTab(_ source: BarSource, onto target: BarSource) {
+        if case .pinboard(let id) = source, let i = pinboards.firstIndex(where: { $0.id == id }),
+           pinboards[i].groupID != nil {
+            pinboards[i].groupID = nil
+            scheduleSave()
+        }
         let moved = TabOrder.moving(source, onto: target, in: barTabs)
         // Keep tabs that are hidden right now (CleanShot not installed, a
         // missing folder) in the stored order, after the visible ones.
@@ -429,7 +455,12 @@ final class ClipboardStore {
         let rank = Dictionary(moved.enumerated().compactMap { offset, tab -> (UUID, Int)? in
             if case .pinboard(let id) = tab { return (id, offset) } else { return nil }
         }, uniquingKeysWith: { a, _ in a })
-        let reordered = pinboards.sorted { (rank[$0.id] ?? .max) < (rank[$1.id] ?? .max) }
+        let reordered = pinboards.enumerated()
+            .sorted { a, b in
+                let ra = rank[a.element.id] ?? Int.max, rb = rank[b.element.id] ?? Int.max
+                return ra != rb ? ra < rb : a.offset < b.offset
+            }
+            .map(\.element)
         if reordered.map(\.id) != pinboards.map(\.id) {
             pinboards = reordered
             scheduleSave()
@@ -440,6 +471,76 @@ final class ClipboardStore {
         let tabs = barTabs
         guard let from = tabs.firstIndex(of: source), tabs.indices.contains(from + offset) else { return }
         moveTab(source, onto: tabs[from + offset])
+    }
+
+    // MARK: - Pinboard folders
+
+    func pinboards(in groupID: UUID) -> [Pinboard] {
+        pinboards.filter { $0.groupID == groupID }
+    }
+
+    /// The folder a pinboard sits in, ignoring a folder that no longer exists.
+    func group(of board: Pinboard) -> PinboardGroup? {
+        guard let id = board.groupID else { return nil }
+        return groups.first { $0.id == id }
+    }
+
+    /// The folder whose second row belongs to a tab: the folder itself, or
+    /// the folder of a pinboard inside it.
+    func group(for source: BarSource) -> PinboardGroup? {
+        switch source {
+        case .group(let id): groups.first { $0.id == id }
+        case .pinboard(let id): pinboards.first { $0.id == id }.flatMap { group(of: $0) }
+        default: nil
+        }
+    }
+
+    @discardableResult
+    func addGroup(name: String) -> PinboardGroup {
+        let group = PinboardGroup(name: name)
+        groups.append(group)
+        scheduleSave()
+        return group
+    }
+
+    func renameGroup(_ id: UUID, to name: String) {
+        guard let i = groups.firstIndex(where: { $0.id == id }) else { return }
+        groups[i].name = name
+        scheduleSave()
+    }
+
+    /// Removes the folder; its pinboards stay, back in the bar's top row.
+    func deleteGroup(_ id: UUID) {
+        if group(for: source)?.id == id { source = .history; selectFirst() }
+        groups.removeAll { $0.id == id }
+        for i in pinboards.indices where pinboards[i].groupID == id { pinboards[i].groupID = nil }
+        scheduleSave()
+    }
+
+    /// Moves a pinboard into a folder, in front of `targetID` when given and
+    /// at the end of the folder otherwise.
+    func movePinboard(_ id: UUID, into groupID: UUID, before targetID: UUID? = nil) {
+        guard id != targetID, groups.contains(where: { $0.id == groupID }),
+              let from = pinboards.firstIndex(where: { $0.id == id }) else { return }
+        var board = pinboards.remove(at: from)
+        board.groupID = groupID
+        let index: Int
+        if let targetID, let to = pinboards.firstIndex(where: { $0.id == targetID }) {
+            index = to
+        } else if let last = pinboards.lastIndex(where: { $0.groupID == groupID }) {
+            index = last + 1
+        } else {
+            index = pinboards.endIndex
+        }
+        pinboards.insert(board, at: index)
+        scheduleSave()
+    }
+
+    /// Takes a pinboard out of its folder and puts it at the end of the bar.
+    func removeFromGroup(_ id: UUID) {
+        guard let i = pinboards.firstIndex(where: { $0.id == id }) else { return }
+        pinboards[i].groupID = nil
+        scheduleSave()
     }
 
     func recolorPinboard(_ id: UUID, to colorHex: String) {
@@ -743,6 +844,8 @@ final class ClipboardStore {
     private struct Snapshot: Codable {
         var history: [ClipItem]
         var pinboards: [Pinboard]
+        /// Missing in stores written before pinboard folders.
+        var groups: [PinboardGroup]?
     }
 
     private func load() {
@@ -750,6 +853,7 @@ final class ClipboardStore {
               let snap = try? JSONDecoder().decode(Snapshot.self, from: data) else { return }
         history = snap.history
         pinboards = snap.pinboards
+        groups = snap.groups ?? []
         selectFirst()
     }
 
@@ -761,7 +865,7 @@ final class ClipboardStore {
     }
 
     func saveNow() {
-        let snap = Snapshot(history: history, pinboards: pinboards)
+        let snap = Snapshot(history: history, pinboards: pinboards, groups: groups)
         guard let data = try? JSONEncoder().encode(snap) else { return }
         ignoreWatchUntil = Date().addingTimeInterval(1.5)
         try? data.write(to: storeURL, options: .atomic)
@@ -953,6 +1057,9 @@ final class ClipboardStore {
         }
         pinboards = pinboards.map { byID[$0.id] ?? $0 }
             + byID.values.filter { b in !pinboards.contains(where: { $0.id == b.id }) }
+        for g in snap.groups ?? [] where !groups.contains(where: { $0.id == g.id }) {
+            groups.append(g)
+        }
 
         combined.removeAll()
         selectFirst()

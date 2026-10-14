@@ -380,6 +380,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         case .pinboard(let id): store.pinboards.contains { $0.id == id }
         case .cleanShot: CleanShotLibrary.shared.isAvailable
         case .folder(let path): FolderLibrary.shared.folders.contains(path)
+        case .group(let id): store.groups.contains { $0.id == id }
         }
     }
 

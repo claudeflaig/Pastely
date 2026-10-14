@@ -5,15 +5,31 @@ struct Pinboard: Identifiable, Codable, Equatable {
     var name: String
     var colorHex: String
     var items: [ClipItem]
+    /// The pinboard folder this pinboard sits in, if any.
+    var groupID: UUID?
 
-    init(id: UUID = UUID(), name: String, colorHex: String = "#5B8DEF", items: [ClipItem] = []) {
+    init(id: UUID = UUID(), name: String, colorHex: String = "#5B8DEF", items: [ClipItem] = [],
+         groupID: UUID? = nil) {
         self.id = id
         self.name = name
         self.colorHex = colorHex
         self.items = items
+        self.groupID = groupID
     }
 
     var color: Color { Color(hex: colorHex) ?? .accentColor }
+}
+
+/// A folder of pinboards: one tab in the bar, with its pinboards in a
+/// second row underneath. Folders hold pinboards only, not other folders.
+struct PinboardGroup: Identifiable, Codable, Equatable {
+    let id: UUID
+    var name: String
+
+    init(id: UUID = UUID(), name: String) {
+        self.id = id
+        self.name = name
+    }
 }
 
 extension Color {

@@ -378,6 +378,7 @@ private struct GeneralSettings: View {
                     .labelsHidden()
                     .fixedSize()
                 }
+                SettingsToggle(title: "Play a sound when a copy reaches Pastely", isOn: $settings.playSoundOnCapture)
                 SettingsToggle(title: "Play a sound when pasting", isOn: $settings.playSound)
                 SettingsToggle(title: "Play a sound when copying from Pastely", isOn: $settings.playSoundOnCopy)
                 #if MAS

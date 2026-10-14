@@ -235,19 +235,45 @@ struct ClipCardView: View {
     }
 
     /// Over a checkerboard, so a transparent cut-out is distinguishable from
-    /// an image on white.
+    /// an image on white. An image close to the card's shape fills it; a wide
+    /// or tall one is shown whole, over a blurred copy of itself, instead of
+    /// losing most of the picture to the crop. The image is sized to the
+    /// canvas rather than the canvas to the image, so a large picture can no
+    /// longer stretch the card past the bar.
     private var imageCanvas: some View {
-        ZStack {
-            CheckerboardBackground()
-            if let image = preview ?? ClipPreviewProvider.cachedImage(for: item) {
-                Image(nsImage: image)
-                    .resizable().interpolation(.medium).scaledToFill()
-            } else {
-                placeholder("photo")
+        GeometryReader { geo in
+            ZStack {
+                CheckerboardBackground()
+                if let image = preview ?? ClipPreviewProvider.cachedImage(for: item) {
+                    let fills = Self.imageFillsCanvas(image.size, canvas: geo.size)
+                    if !fills {
+                        Image(nsImage: image)
+                            .resizable().interpolation(.low).scaledToFill()
+                            .frame(width: geo.size.width, height: geo.size.height)
+                            .blur(radius: 20)
+                            .opacity(0.6)
+                            .clipped()
+                    }
+                    Image(nsImage: image)
+                        .resizable().interpolation(.high)
+                        .aspectRatio(contentMode: fills ? .fill : .fit)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .clipped()
+                } else {
+                    placeholder("photo")
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
+    }
+
+    /// Whether an image is close enough to the canvas's shape to fill it
+    /// with only a slight crop.
+    static func imageFillsCanvas(_ image: CGSize, canvas: CGSize) -> Bool {
+        guard image.width > 0, image.height > 0, canvas.width > 0, canvas.height > 0 else { return true }
+        let ratio = (image.width / image.height) / (canvas.width / canvas.height)
+        return ratio > 0.75 && ratio < 1.33
     }
 
     @ViewBuilder

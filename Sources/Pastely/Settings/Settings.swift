@@ -279,6 +279,7 @@ final class Settings {
         static let pasteDirectly = "pasteDirectly"
         static let playSound = "playSound"
         static let playSoundOnCopy = "playSoundOnCopy"
+        static let playSoundOnCapture = "playSoundOnCapture"
         static let promoteOnPaste = "promoteOnPaste"
         static let ignoreConcealed = "ignoreConcealed"
         static let deletePermanently = "deletePermanently"
@@ -380,6 +381,11 @@ final class Settings {
 
     var playSoundOnCopy: Bool {
         didSet { guard isLoaded else { return }; d.set(playSoundOnCopy, forKey: Keys.playSoundOnCopy) }
+    }
+
+    /// A short sound each time a copy lands in Pastely's history.
+    var playSoundOnCapture: Bool {
+        didSet { guard isLoaded else { return }; d.set(playSoundOnCapture, forKey: Keys.playSoundOnCapture) }
     }
 
     /// Pasting a clip moves it to the front of history the way copying it
@@ -574,6 +580,7 @@ final class Settings {
             // Off by default, matching the paste sound: existing users
             // shouldn't gain a new audible behavior from an update.
             Keys.playSoundOnCopy: false,
+            Keys.playSoundOnCapture: true,
             Keys.promoteOnPaste: false,
             Keys.ignoreConcealed: true,
             Keys.deletePermanently: false,
@@ -615,6 +622,7 @@ final class Settings {
         pasteDirectly = d.bool(forKey: Keys.pasteDirectly)
         playSound = d.bool(forKey: Keys.playSound)
         playSoundOnCopy = d.bool(forKey: Keys.playSoundOnCopy)
+        playSoundOnCapture = d.bool(forKey: Keys.playSoundOnCapture)
         promoteOnPaste = d.bool(forKey: Keys.promoteOnPaste)
         ignoreConcealed = d.bool(forKey: Keys.ignoreConcealed)
         deletePermanently = d.bool(forKey: Keys.deletePermanently)

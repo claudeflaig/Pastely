@@ -1,53 +1,34 @@
 import SwiftUI
 
+/// The bar's top row of tabs: Clipboard, then pinboards, pinboard folders,
+/// CleanShot and Finder folders in the order they were dragged into.
 struct PinboardTabs: View {
     @Bindable private var store = ClipboardStore.shared
     /// The tab something is being dragged over, highlighted as a drop target.
     @State private var dropTarget: BarSource?
-    /// The tab being dragged to a new place.
-    @State private var draggedTab: BarSource?
     private var cleanShot: CleanShotLibrary { CleanShotLibrary.shared }
-
-    /// Marks a drag as a tab, told apart from a dragged card: a cancelled
-    /// drag leaves `draggedTab` set, so that alone cannot tell.
-    private static let tabDragType = "ch.claudeflaig.pastely.tab"
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 14) {
-                pill(title: "Clipboard",
-                     dot: nil,
-                     icon: "clock",
-                     selected: store.source == .history) {
+                TabPill(title: "Clipboard", icon: "clock", selected: store.source == .history) {
                     store.source = .history; store.selectFirst()
                 }
 
                 ForEach(store.barTabs, id: \.self) { tab in
                     tabPill(tab)
-                        .onDrop(of: [.item], isTargeted: Binding(
-                            get: { dropTarget == tab },
-                            set: { dropTarget = $0 ? tab : (dropTarget == tab ? nil : dropTarget) }
-                        )) { providers in
+                        .onDrop(of: [.item], isTargeted: TabDrag.targetBinding($dropTarget, tab)) { providers in
                             drop(providers, on: tab)
                         }
-                        // Dragging a tab onto another one reorders the tabs.
-                        .onDrag {
-                            draggedTab = tab
-                            ClipDragProvider.clearDraggedItem()
-                            let provider = NSItemProvider(object: title(of: tab) as NSString)
-                            provider.registerDataRepresentation(forTypeIdentifier: Self.tabDragType,
-                                                                visibility: .all) { completion in
-                                completion(Data(), nil)
-                                return nil
-                            }
-                            return provider
-                        }
+                        .onDrag { TabDrag.begin(tab) }
                         .contextMenu { menu(for: tab) }
                 }
 
                 Menu {
-                    Button("New Pinboard", action: addPinboard)
-                    Button("Add Folder…", action: addFolder)
+                    Button("New Pinboard") { PinboardActions.addPinboard() }
+                    Button("New Pinboard Folder") { PinboardActions.addGroup() }
+                    Divider()
+                    Button("Add Folder from Finder…", action: addFolder)
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 15, weight: .light))
@@ -57,7 +38,7 @@ struct PinboardTabs: View {
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .fixedSize()
-                .help("New Pinboard or Folder")
+                .help("New Pinboard, Pinboard Folder or Finder Folder")
             }
         }
     }
@@ -68,24 +49,33 @@ struct PinboardTabs: View {
         switch tab {
         case .pinboard(let id):
             if let board = store.pinboards.first(where: { $0.id == id }) {
-                pill(title: board.name, dot: board.color, selected: highlighted) {
+                TabPill(title: board.name, dot: board.color, selected: highlighted) {
                     store.source = tab; store.selectFirst()
                 }
                 // Rename lived only in the context menu, which nobody found (#100).
-                .simultaneousGesture(TapGesture(count: 2).onEnded { rename(board) })
+                .simultaneousGesture(TapGesture(count: 2).onEnded { PinboardActions.rename(board) })
                 .help("Double-click or right-click to rename")
             }
+        case .group(let id):
+            if let group = store.groups.first(where: { $0.id == id }) {
+                // A folder stays lit while one of its pinboards is open.
+                TabPill(title: group.name, icon: "folder",
+                        selected: highlighted || store.group(for: store.source)?.id == id) {
+                    store.source = tab; store.selectFirst()
+                }
+                .simultaneousGesture(TapGesture(count: 2).onEnded { PinboardActions.rename(group) })
+                .help("Drop a pinboard tab here to move it into the folder")
+            }
         case .cleanShot:
-            pill(title: "CleanShot", dot: nil, icon: "camera.viewfinder", selected: highlighted) {
+            TabPill(title: "CleanShot", icon: "camera.viewfinder", selected: highlighted) {
                 cleanShot.refresh()
                 store.source = tab; store.selectFirst()
             }
             .help("Your CleanShot X capture history")
         case .folder(let path):
-            pill(title: FolderLibrary.title(for: path),
-                 dot: nil,
-                 icon: path == Settings.downloadsPath ? "arrow.down.circle" : "folder",
-                 selected: highlighted) {
+            TabPill(title: FolderLibrary.title(for: path),
+                    icon: path == Settings.downloadsPath ? "arrow.down.circle" : "folder.badge.gearshape",
+                    selected: highlighted) {
                 FolderLibrary.shared.refresh(path)
                 store.source = tab; store.selectFirst()
             }
@@ -95,90 +85,162 @@ struct PinboardTabs: View {
         }
     }
 
-    private func title(of tab: BarSource) -> String {
-        switch tab {
-        case .pinboard(let id): store.pinboards.first(where: { $0.id == id })?.name ?? "Pinboard"
-        case .cleanShot: "CleanShot"
-        case .folder(let path): FolderLibrary.title(for: path)
-        case .history: "Clipboard"
-        }
-    }
-
     private func drop(_ providers: [NSItemProvider], on tab: BarSource) -> Bool {
-        let isTabDrag = providers.contains { $0.registeredTypeIdentifiers.contains(Self.tabDragType) }
-            // In case the mark gets lost on the way: a card drag always
-            // leaves its clip behind, a tab drag clears it.
-            || (draggedTab != nil && ClipDragProvider.recentlyDraggedItem == nil)
-        if isTabDrag {
-            guard let dragged = draggedTab else { return false }
-            draggedTab = nil
-            withAnimation(.easeOut(duration: 0.2)) { store.moveTab(dragged, onto: tab) }
+        if let dragged = TabDrag.take(providers) {
+            withAnimation(.easeOut(duration: 0.2)) {
+                // A pinboard dropped on a folder goes into it.
+                if case .group(let groupID) = tab, case .pinboard(let boardID) = dragged {
+                    store.movePinboard(boardID, into: groupID)
+                } else {
+                    store.moveTab(dragged, onto: tab)
+                }
+            }
             return true
         }
-        // Dropping a card on a pinboard tab saves it there, as in Paste.
-        guard case .pinboard(let boardID) = tab,
-              let item = ClipDragProvider.recentlyDraggedItem else { return false }
-        ClipDragProvider.clearDraggedItem()
-        store.saveToPinboard(item, boardID: boardID)
-        return true
+        return PinboardActions.saveDraggedCard(on: tab)
     }
 
     @ViewBuilder
     private func menu(for tab: BarSource) -> some View {
-        if case .pinboard(let id) = tab, let board = store.pinboards.first(where: { $0.id == id }) {
-            Button("Rename…") { rename(board) }
-        }
-        Button("Move Left") { store.moveTab(tab, by: -1) }
-            .disabled(store.barTabs.first == tab)
-        Button("Move Right") { store.moveTab(tab, by: 1) }
-            .disabled(store.barTabs.last == tab)
-        if case .pinboard(let id) = tab {
-            Menu("Color") {
-                ForEach(ClipboardStore.pinboardColors, id: \.self) { hex in
-                    Button {
-                        store.recolorPinboard(id, to: hex)
-                    } label: {
-                        Label {
-                            Text(Self.colorName(hex))
-                        } icon: {
-                            Image(nsImage: Self.dot(hex))
-                        }
-                    }
-                }
+        switch tab {
+        case .pinboard(let id):
+            if let board = store.pinboards.first(where: { $0.id == id }) {
+                Button("Rename…") { PinboardActions.rename(board) }
+                moveItems(tab)
+                PinboardActions.folderMenu(for: board)
+                PinboardActions.colorMenu(for: board)
+                Divider()
+                Button("Delete Pinboard", role: .destructive) { store.deletePinboard(id) }
             }
-            Divider()
-            Button("Delete Pinboard", role: .destructive) {
-                store.deletePinboard(id)
+        case .group(let id):
+            if let group = store.groups.first(where: { $0.id == id }) {
+                Button("Rename…") { PinboardActions.rename(group) }
+                Button("New Pinboard in Folder") { PinboardActions.addPinboard(in: id) }
+                moveItems(tab)
+                Divider()
+                Button("Delete Folder (Keep Pinboards)", role: .destructive) { store.deleteGroup(id) }
             }
-        }
-        if case .folder(let path) = tab {
+        case .folder(let path):
+            moveItems(tab)
             Divider()
             Button("Remove from Bar") {
                 if store.source == tab { store.source = .history; store.selectFirst() }
                 FolderLibrary.shared.remove(path)
             }
+        case .cleanShot:
+            moveItems(tab)
+        case .history:
+            EmptyView()
         }
     }
 
-    /// A tap gesture rather than a Button: a Button tracks the mouse itself and
-    /// swallows the drag, so `.onDrag` on a tab never started.
-    private func pill(title: String, dot: Color?, icon: String? = nil,
-                      selected: Bool, action: @escaping () -> Void) -> some View {
-        HStack(spacing: 8) {
+    @ViewBuilder
+    private func moveItems(_ tab: BarSource) -> some View {
+        Button("Move Left") { store.moveTab(tab, by: -1) }
+            .disabled(store.barTabs.first == tab)
+        Button("Move Right") { store.moveTab(tab, by: 1) }
+            .disabled(store.barTabs.last == tab)
+    }
+
+    private func addFolder() {
+        guard let path = FolderLibrary.shared.chooseAndAdd() else { return }
+        store.source = .folder(path); store.selectFirst()
+    }
+}
+
+/// The second row under a pinboard folder's tab: All, then the folder's
+/// pinboards, which drag, rename and take dropped cards like any pinboard.
+struct PinboardGroupRow: View {
+    let group: PinboardGroup
+    @Bindable private var store = ClipboardStore.shared
+    @State private var dropTarget: BarSource?
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                Image(systemName: "arrow.turn.down.right")
+                    .font(.system(size: 11, weight: .light))
+                    .foregroundStyle(Theme.chromeTextTertiary)
+                TabPill(title: "All", icon: "square.stack", compact: true,
+                        selected: store.source == .group(group.id) || dropTarget == .group(group.id)) {
+                    store.source = .group(group.id); store.selectFirst()
+                }
+                .onDrop(of: [.item], isTargeted: TabDrag.targetBinding($dropTarget, .group(group.id))) { providers in
+                    guard let dragged = TabDrag.take(providers), case .pinboard(let id) = dragged else { return false }
+                    withAnimation(.easeOut(duration: 0.2)) { store.movePinboard(id, into: group.id) }
+                    return true
+                }
+
+                ForEach(store.pinboards(in: group.id)) { board in
+                    let tab = BarSource.pinboard(board.id)
+                    TabPill(title: board.name, dot: board.color, compact: true,
+                            selected: store.source == tab || dropTarget == tab) {
+                        store.source = tab; store.selectFirst()
+                    }
+                    .simultaneousGesture(TapGesture(count: 2).onEnded { PinboardActions.rename(board) })
+                    .help("Double-click or right-click to rename")
+                    .onDrop(of: [.item], isTargeted: TabDrag.targetBinding($dropTarget, tab)) { providers in
+                        if let dragged = TabDrag.take(providers) {
+                            guard case .pinboard(let id) = dragged else { return false }
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                store.movePinboard(id, into: group.id, before: board.id)
+                            }
+                            return true
+                        }
+                        return PinboardActions.saveDraggedCard(on: tab)
+                    }
+                    .onDrag { TabDrag.begin(tab) }
+                    .contextMenu {
+                        Button("Rename…") { PinboardActions.rename(board) }
+                        PinboardActions.folderMenu(for: board)
+                        PinboardActions.colorMenu(for: board)
+                        Divider()
+                        Button("Delete Pinboard", role: .destructive) { store.deletePinboard(board.id) }
+                    }
+                }
+
+                Button { PinboardActions.addPinboard(in: group.id) } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 13, weight: .light))
+                        .foregroundStyle(Theme.chromeTextSecondary)
+                        .frame(width: 22, height: 22)
+                }
+                .buttonStyle(.plain)
+                .help("New Pinboard in \(group.name)")
+            }
+            .padding(.horizontal, 18)
+        }
+        .frame(height: 34)
+    }
+}
+
+/// A tab. A tap gesture rather than a Button: a Button tracks the mouse
+/// itself and swallows the drag, so `.onDrag` on a tab never started.
+struct TabPill: View {
+    let title: String
+    var dot: Color? = nil
+    var icon: String? = nil
+    /// The smaller size of a folder's second row.
+    var compact = false
+    let selected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        HStack(spacing: compact ? 6 : 8) {
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: compact ? 11 : 12, weight: .medium))
             }
             if let dot {
-                Circle().fill(dot).frame(width: 11, height: 11)
+                Circle().fill(dot).frame(width: compact ? 9 : 11, height: compact ? 9 : 11)
             }
             Text(title)
-                .font(.system(size: 14, weight: selected ? .medium : .light))
+                .font(.system(size: compact ? 12.5 : 14, weight: selected ? .medium : .light))
                 .lineLimit(1)
         }
         .foregroundStyle(selected ? Theme.chromeTextPrimary : Theme.chromeTextSecondary)
-        .padding(.horizontal, 12)
-        .frame(height: 30)
+        .padding(.horizontal, compact ? 10 : 12)
+        .frame(height: compact ? 26 : 30)
         .background(selected ? Theme.pillSelected : Theme.pillBG, in: Capsule())
         .contentShape(Capsule())
         .onTapGesture(perform: action)
@@ -187,6 +249,127 @@ struct PinboardTabs: View {
         .accessibilityAction(.default, action)
         .fixedSize()
         .animation(.easeOut(duration: 0.15), value: selected)
+    }
+}
+
+/// The tab being dragged, shared by both rows so a pinboard can be dragged
+/// between the top row and a folder's row.
+@MainActor
+enum TabDrag {
+    private static var dragged: BarSource?
+
+    /// Marks a drag as a tab, told apart from a dragged card: a cancelled
+    /// drag leaves `dragged` set, so that alone cannot tell.
+    private static let typeIdentifier = "ch.claudeflaig.pastely.tab"
+
+    static func begin(_ tab: BarSource) -> NSItemProvider {
+        dragged = tab
+        ClipDragProvider.clearDraggedItem()
+        let provider = NSItemProvider(object: (TabOrder.key(tab) ?? "tab") as NSString)
+        provider.registerDataRepresentation(forTypeIdentifier: typeIdentifier, visibility: .all) { completion in
+            completion(Data(), nil)
+            return nil
+        }
+        return provider
+    }
+
+    /// The dragged tab, if this drop is a tab drag, consumed.
+    static func take(_ providers: [NSItemProvider]) -> BarSource? {
+        let isTabDrag = providers.contains { $0.registeredTypeIdentifiers.contains(typeIdentifier) }
+            // In case the mark gets lost on the way: a card drag always
+            // leaves its clip behind, a tab drag clears it.
+            || (dragged != nil && ClipDragProvider.recentlyDraggedItem == nil)
+        guard isTabDrag, let tab = dragged else { return nil }
+        dragged = nil
+        return tab
+    }
+
+    static func targetBinding(_ target: Binding<BarSource?>, _ tab: BarSource) -> Binding<Bool> {
+        Binding(
+            get: { target.wrappedValue == tab },
+            set: { target.wrappedValue = $0 ? tab : (target.wrappedValue == tab ? nil : target.wrappedValue) }
+        )
+    }
+}
+
+/// Pinboard actions both tab rows offer.
+@MainActor
+enum PinboardActions {
+    private static var store: ClipboardStore { .shared }
+
+    static func addPinboard(in groupID: UUID? = nil) {
+        let board = store.addPinboard(name: "New Pinboard")
+        if let groupID { store.movePinboard(board.id, into: groupID) }
+        store.source = .pinboard(board.id); store.selectFirst()
+    }
+
+    static func addGroup() {
+        guard let name = TextPrompt.run(title: "New Pinboard Folder",
+                                        message: "Name the folder. Drop pinboard tabs on it to fill it.",
+                                        defaultValue: "New Folder") else { return }
+        let group = store.addGroup(name: name)
+        store.source = .group(group.id); store.selectFirst()
+    }
+
+    static func rename(_ board: Pinboard) {
+        if let name = TextPrompt.run(title: "Rename Pinboard", message: "Enter a new name",
+                                     defaultValue: board.name) {
+            store.renamePinboard(board.id, to: name)
+        }
+    }
+
+    static func rename(_ group: PinboardGroup) {
+        if let name = TextPrompt.run(title: "Rename Folder", message: "Enter a new name",
+                                     defaultValue: group.name) {
+            store.renameGroup(group.id, to: name)
+        }
+    }
+
+    /// Dropping a card on a pinboard tab saves it there, as in Paste.
+    static func saveDraggedCard(on tab: BarSource) -> Bool {
+        guard case .pinboard(let boardID) = tab,
+              let item = ClipDragProvider.recentlyDraggedItem else { return false }
+        ClipDragProvider.clearDraggedItem()
+        store.saveToPinboard(item, boardID: boardID)
+        return true
+    }
+
+    @ViewBuilder
+    static func folderMenu(for board: Pinboard) -> some View {
+        Menu("Move to Folder") {
+            ForEach(store.groups) { group in
+                Button(group.name) { store.movePinboard(board.id, into: group.id) }
+                    .disabled(board.groupID == group.id)
+            }
+            if !store.groups.isEmpty { Divider() }
+            Button("New Folder…") {
+                guard let name = TextPrompt.run(title: "New Pinboard Folder", message: "Name the folder.",
+                                                defaultValue: "New Folder") else { return }
+                let group = store.addGroup(name: name)
+                store.movePinboard(board.id, into: group.id)
+                store.source = .pinboard(board.id)
+            }
+        }
+        if board.groupID != nil {
+            Button("Remove from Folder") { store.removeFromGroup(board.id) }
+        }
+    }
+
+    @ViewBuilder
+    static func colorMenu(for board: Pinboard) -> some View {
+        Menu("Color") {
+            ForEach(ClipboardStore.pinboardColors, id: \.self) { hex in
+                Button {
+                    store.recolorPinboard(board.id, to: hex)
+                } label: {
+                    Label {
+                        Text(colorName(hex))
+                    } icon: {
+                        Image(nsImage: dot(hex))
+                    }
+                }
+            }
+        }
     }
 
     private static func colorName(_ hex: String) -> String {
@@ -203,24 +386,6 @@ struct PinboardTabs: View {
         }
         image.isTemplate = false
         return image
-    }
-
-    private func addFolder() {
-        guard let path = FolderLibrary.shared.chooseAndAdd() else { return }
-        store.source = .folder(path); store.selectFirst()
-    }
-
-    private func addPinboard() {
-        let board = store.addPinboard(name: "New Pinboard")
-        store.source = .pinboard(board.id)
-    }
-
-    private func rename(_ board: Pinboard) {
-        if let name = TextPrompt.run(title: "Rename Pinboard",
-                                     message: "Enter a new name",
-                                     defaultValue: board.name) {
-            store.renamePinboard(board.id, to: name)
-        }
     }
 }
 

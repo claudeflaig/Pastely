@@ -31,3 +31,18 @@ final class ClipPreviewProviderTests: XCTestCase {
         XCTAssertNil(text)
     }
 }
+
+@MainActor
+final class ImageCanvasFitTests: XCTestCase {
+    private let canvas = CGSize(width: 290, height: 230)
+
+    func testImageCloseToCardShapeFills() {
+        XCTAssertTrue(ClipCardView.imageFillsCanvas(CGSize(width: 1254, height: 1254), canvas: canvas))
+        XCTAssertTrue(ClipCardView.imageFillsCanvas(CGSize(width: 1600, height: 1200), canvas: canvas))
+    }
+
+    func testWideAndTallImagesAreShownWhole() {
+        XCTAssertFalse(ClipCardView.imageFillsCanvas(CGSize(width: 3000, height: 600), canvas: canvas))
+        XCTAssertFalse(ClipCardView.imageFillsCanvas(CGSize(width: 1170, height: 2532), canvas: canvas))
+    }
+}

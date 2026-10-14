@@ -38,7 +38,15 @@ final class ClipboardMonitor {
         guard let item = makeItem() else { return }
         ClipboardStore.shared.addCaptured(item)
         PasteStack.shared.capture(item)
+        if Settings.shared.playSoundOnCapture { Self.captureSound?.play() }
     }
+
+    /// Short and quiet, so it confirms a copy without getting in the way.
+    private static let captureSound: NSSound? = {
+        let sound = NSSound(named: "Tink")
+        sound?.volume = 0.5
+        return sound
+    }()
 
     private func makeItem() -> ClipItem? {
         let types = pasteboard.types ?? []

@@ -25,4 +25,11 @@ final class TabOrderTests: XCTestCase {
     func testHistoryHasNoKey() {
         XCTAssertNil(TabOrder.key(.history))
     }
+
+    func testPinboardFolderSortsAmongOtherTabs() {
+        let group = BarSource.group(UUID())
+        let order = [group, a].compactMap(TabOrder.key)
+        XCTAssertEqual(TabOrder.sorted([a, b, group, downloads], by: order), [group, a, b, downloads])
+        XCTAssertEqual(TabOrder.moving(group, onto: b, in: [a, b, group]), [a, group, b])
+    }
 }
