@@ -600,6 +600,15 @@ private struct HistorySettings: View {
         }
     }
 
+    private func importFromPasty() {
+        do {
+            let result = try PastyImporter.importPinboards()
+            importMessage = "Imported \(result.clips) clips into \(result.boards) pinboards from Pasty."
+        } catch {
+            importMessage = "Pasty's data could not be read: \(error.localizedDescription)"
+        }
+    }
+
     private func importPinboards() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.json]
@@ -630,6 +639,12 @@ private struct HistorySettings: View {
                 }
                 SettingsRow(title: "Import pinboards", detail: "Boards with the same name are merged; duplicates are skipped.") {
                     Button("Import…") { importPinboards() }.controlSize(.small)
+                }
+                do {
+                    SettingsRow(title: "Import from Pasty",
+                                detail: "macOS asks once whether Pastely may read Pasty's data.") {
+                        Button("Import…") { importFromPasty() }.controlSize(.small)
+                    }
                 }
             }
 

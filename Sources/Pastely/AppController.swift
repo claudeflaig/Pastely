@@ -64,6 +64,20 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if Settings.shared.cloudKitSync { CloudSyncService.shared.start() }
         #endif
 
+        // `--import-pasty` runs the Pasty migration at launch and records the
+        // outcome, so it needs no clicks beyond the macOS consent dialog.
+        if CommandLine.arguments.contains("--import-pasty") {
+            let result: String
+            do {
+                let imported = try PastyImporter.importPinboards()
+                result = "imported \(imported.clips) clips into \(imported.boards) pinboards"
+            } catch {
+                result = "failed: \(error)"
+            }
+            try? result.write(to: ClipboardStore.localBase.appendingPathComponent("pasty-import.log"),
+                              atomically: true, encoding: .utf8)
+        }
+
         if CommandLine.arguments.contains("--demo") {
             store.seedDemo()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in

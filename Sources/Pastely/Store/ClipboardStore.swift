@@ -68,9 +68,12 @@ final class ClipboardStore {
     private var fileWatch: DispatchSourceFileSystemObject?
     private var ignoreWatchUntil: Date = .distantPast
 
+    /// `--demo` keeps its sample clips in a folder of their own, so trying
+    /// the demo never mixes them into someone's real history.
     static var localBase: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Pastely", isDirectory: true)
+            .appendingPathComponent(CommandLine.arguments.contains("--demo") ? "Pastely Demo" : "Pastely",
+                                    isDirectory: true)
     }
 
     static var isSandboxed: Bool {

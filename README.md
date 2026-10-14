@@ -38,6 +38,16 @@ Damit Pastely direkt in andere Apps einfügen und den Paste Stack weiterschalten
 swift test
 ```
 
+Liegt das Projekt in einem über iCloud synchronisierten Ordner (z. B. Dokumente), hängt iCloud Zusatzinfos an die Build-Dateien und die Signierung der Tests schlägt fehl. Dann mit einem Build-Ordner außerhalb von iCloud testen:
+
+```bash
+swift test --scratch-path ~/Library/Caches/Pastely-build
+```
+
+## Aus Pasty umziehen
+
+Unter Einstellungen → History → „Import from Pasty“ übernimmt Pastely alle Pinboards samt Vorlagen-Titeln aus Pasty. macOS verlangt dafür einmalig Zugriff auf Pastys Daten (Festplattenvollzugriff für Pastely).
+
 ## Lizenz
 
 MIT, siehe [LICENSE](LICENSE). Der ursprüngliche Copyright-Hinweis von Pesty bleibt erhalten.

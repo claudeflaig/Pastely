@@ -17,6 +17,11 @@ struct PinboardArchive: Codable, Equatable {
         var colorHex: String?
         var fileURLs: [String]?
         var imagePNG: Data?
+        var rtf: Data?
+        var html: Data?
+        var sourceBundleID: String?
+        var sourceAppName: String?
+        var createdAt: Date?
     }
 
     var format = "pastely.pinboards"
@@ -44,9 +49,14 @@ struct PinboardArchive: Codable, Equatable {
         guard let type else { return nil }
         let clip = ClipItem(type: type,
                             text: item.text,
+                            rtfData: item.rtf,
+                            htmlData: item.html,
                             fileURLs: item.fileURLs ?? [],
                             colorHex: item.colorHex,
-                            customTitle: item.title)
+                            sourceBundleID: item.sourceBundleID,
+                            sourceAppName: item.sourceAppName,
+                            customTitle: item.title,
+                            createdAt: item.createdAt ?? Date())
         return (clip, item.imagePNG)
     }
 }
@@ -68,7 +78,12 @@ extension ClipboardStore {
                                                 text: item.text,
                                                 colorHex: item.colorHex,
                                                 fileURLs: item.fileURLs.isEmpty ? nil : item.fileURLs,
-                                                imagePNG: png)
+                                                imagePNG: png,
+                                                rtf: item.rtfData,
+                                                html: item.htmlData,
+                                                sourceBundleID: item.sourceBundleID,
+                                                sourceAppName: item.sourceAppName,
+                                                createdAt: item.createdAt)
                 })
         })
     }
