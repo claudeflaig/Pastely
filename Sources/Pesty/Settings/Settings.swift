@@ -262,6 +262,8 @@ final class Settings {
         static let barAppearance = "barAppearance"
         static let barEdge = "barEdge"
         static let linkPreviews = "linkPreviews"
+        static let showCleanShotHistory = "showCleanShotHistory"
+        static let hideWhileScreenSharing = "hideWhileScreenSharing"
     }
 
     var historyLimit: Int {
@@ -423,6 +425,15 @@ final class Settings {
         didSet { guard isLoaded else { return }; d.set(linkPreviews, forKey: Keys.linkPreviews) }
     }
 
+    var showCleanShotHistory: Bool {
+        didSet { guard isLoaded else { return }; d.set(showCleanShotHistory, forKey: Keys.showCleanShotHistory) }
+    }
+
+    /// Keeps the bar out of screen sharing, recordings and screenshots.
+    var hideWhileScreenSharing: Bool {
+        didSet { guard isLoaded else { return }; d.set(hideWhileScreenSharing, forKey: Keys.hideWhileScreenSharing) }
+    }
+
     private init() {
         d.register(defaults: [
             Keys.historyLimit: 500,
@@ -454,7 +465,9 @@ final class Settings {
             Keys.selectedClipPosition: SelectedClipPosition.center.rawValue,
             Keys.barAppearance: BarAppearance.system.rawValue,
             Keys.barEdge: BarEdge.bottom.rawValue,
-            Keys.linkPreviews: true
+            Keys.linkPreviews: true,
+            Keys.showCleanShotHistory: true,
+            Keys.hideWhileScreenSharing: false
         ])
         historyLimit = d.integer(forKey: Keys.historyLimit)
         historyRetentionMode = HistoryRetentionMode(rawValue: d.string(forKey: Keys.historyRetentionMode) ?? "")
@@ -488,6 +501,8 @@ final class Settings {
         barAppearance = BarAppearance(rawValue: d.integer(forKey: Keys.barAppearance)) ?? .system
         barEdge = BarEdge(rawValue: d.integer(forKey: Keys.barEdge)) ?? .bottom
         linkPreviews = d.bool(forKey: Keys.linkPreviews)
+        showCleanShotHistory = d.bool(forKey: Keys.showCleanShotHistory)
+        hideWhileScreenSharing = d.bool(forKey: Keys.hideWhileScreenSharing)
         isLoaded = true
         if normalizedBarHeight != storedBarHeight {
             d.set(normalizedBarHeight, forKey: Keys.barHeight)

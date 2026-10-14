@@ -8,6 +8,8 @@ extension Notification.Name {
 enum BarSource: Equatable {
     case history
     case pinboard(UUID)
+    /// CleanShot X's capture history: read-only, owned by CleanShot.
+    case cleanShot
 }
 
 /// Whether keyboard focus currently belongs to the native search field or
@@ -109,10 +111,14 @@ final class ClipboardStore {
             base = history
         case .pinboard(let id):
             base = pinboards.first(where: { $0.id == id })?.items ?? []
+        case .cleanShot:
+            base = CleanShotLibrary.shared.items
         }
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !q.isEmpty else { return base }
-        return base.filter { $0.searchableText.contains(q) }
+        return base.filter {
+            $0.searchableText.contains(q) || (ImageTextIndex.text(for: $0)?.contains(q) ?? false)
+        }
     }
 
     var selectedItem: ClipItem? {
@@ -253,6 +259,9 @@ final class ClipboardStore {
             guard let boardIndex = pinboards.firstIndex(where: { $0.id == boardID }) else { return }
             placements = Self.placements(of: ids, in: pinboards[boardIndex].items, container: source)
             pinboards[boardIndex].items.removeAll { ids.contains($0.id) }
+        case .cleanShot:
+            // Captures belong to CleanShot; deleting them is done there.
+            return
         }
         if permanently || Settings.shared.deletePermanently {
             for placement in placements { deleteImageFile(placement.item) }
@@ -314,6 +323,8 @@ final class ClipboardStore {
                     continue
                 }
                 if restore(placement, into: &pinboards[i].items) { restored.append(placement.item.id) }
+            case .cleanShot:
+                continue
             }
         }
         refreshUndoState()

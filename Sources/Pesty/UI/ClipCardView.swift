@@ -60,12 +60,15 @@ struct ClipCardView: View {
         ZStack(alignment: .leading) {
             headerColor
             VStack(alignment: .leading, spacing: 1) {
-                Text(cardTypeLabel)
+                Text(customTitle ?? cardTypeLabel)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(Theme.headerText)
-                Text(item.createdAt.clipRelativeLong)
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(Theme.headerSubText)
+                // A renamed card shows its name alone, as Paste does.
+                if customTitle == nil {
+                    Text(item.createdAt.clipRelativeLong)
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(Theme.headerSubText)
+                }
             }
             .lineLimit(1)
             .padding(.leading, 14)
@@ -76,8 +79,17 @@ struct ClipCardView: View {
         .clipped()
     }
 
+    private var customTitle: String? {
+        guard let title = item.customTitle?.trimmingCharacters(in: .whitespaces), !title.isEmpty else { return nil }
+        return title
+    }
+
     private var cardTypeLabel: String {
         if item.type == .file, item.fileURLs.count > 1 { return "\(item.fileURLs.count) files" }
+        if let url = ClipPreviewProvider.imageFileURL(for: item) {
+            return ScreenshotDetector.isScreenshot(url) ? "Screenshot" : "Image"
+        }
+        if item.type == .image { return "Image" }
         return item.type.label
     }
 
@@ -96,7 +108,7 @@ struct ClipCardView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .padding(.horizontal, fillsBody ? 0 : 16)
                 .padding(.top, fillsBody ? 0 : 14)
-            if !showsImage {
+            if !showsImage && item.type != .color {
                 footer
                     .padding(.horizontal, 16)
                     .padding(.bottom, 12)
@@ -120,7 +132,14 @@ struct ClipCardView: View {
     }
 
     private var fillsBody: Bool {
-        showsImage || (item.type == .link && showsLinkHero)
+        showsImage || item.type == .color
+    }
+
+    /// Dark text on light colors, white on dark ones.
+    private var colorCardInk: Color {
+        guard let ns = NSColor(hex: item.colorHex ?? "")?.usingColorSpace(.sRGB) else { return .white }
+        let luminance = 0.299 * ns.redComponent + 0.587 * ns.greenComponent + 0.114 * ns.blueComponent
+        return luminance > 0.6 ? .black.opacity(0.78) : .white.opacity(0.95)
     }
 
     /// Image clips, and file clips pointing at an image, which is how a copied
@@ -135,11 +154,13 @@ struct ClipCardView: View {
         case .image:
             imageCanvas
         case .color:
+            // Paste floods the whole card body with the color and centers the
+            // hex code in a monospaced face that stays readable on it.
             ZStack {
-                RoundedRectangle(cornerRadius: 8).fill(Color(hex: item.colorHex ?? "#000") ?? .black)
-                Text(item.colorHex ?? "")
-                    .font(.system(size: 13, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.white).shadow(radius: 1)
+                Color(hex: item.colorHex ?? "#000") ?? .black
+                Text((item.colorHex ?? "").uppercased())
+                    .font(.system(size: 24, weight: .medium, design: .monospaced))
+                    .foregroundStyle(colorCardInk)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .file:
@@ -160,33 +181,40 @@ struct ClipCardView: View {
         }
     }
 
-    /// A page's hero image fills the card above its title, as in Paste. A site
-    /// that only offers a favicon gets it centered instead of stretched.
+    /// A link reads as a web page, not a picture: its preview image sits
+    /// inset as a rounded thumbnail in the page's own 1.91:1 social-card
+    /// shape, unlike screenshots, which run edge to edge. A site without an
+    /// image shows its favicon on a quiet tile instead.
     @ViewBuilder
     private var linkContent: some View {
-        if let image = linkPreview?.image, showsLinkHero {
-            // Fit to the card's width, so a wide social image keeps its
-            // text readable instead of being cropped at the sides.
-            Image(nsImage: image)
-                .resizable().interpolation(.medium).scaledToFit()
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .clipped()
-        } else {
-            VStack {
-                Spacer(minLength: 0)
-                if let icon = linkPreview?.image {
-                    Image(nsImage: icon)
-                        .resizable().interpolation(.high).scaledToFit()
-                        .frame(width: 56, height: 56)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                } else {
-                    Image(systemName: "safari").font(.system(size: 34, weight: .light))
-                        .foregroundStyle(Theme.cardTextTertiary)
+        Group {
+            if let image = linkPreview?.image, showsLinkHero {
+                Color.clear
+                    .overlay(
+                        Image(nsImage: image)
+                            .resizable().interpolation(.medium).scaledToFill()
+                    )
+            } else {
+                ZStack {
+                    Theme.fieldBG
+                    if let icon = linkPreview?.icon ?? linkPreview?.image {
+                        Image(nsImage: icon)
+                            .resizable().interpolation(.high).scaledToFit()
+                            .frame(width: 44, height: 44)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    } else {
+                        Image(systemName: "globe").font(.system(size: 30, weight: .light))
+                            .foregroundStyle(Theme.cardTextTertiary)
+                    }
                 }
-                Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity)
         }
+        .aspectRatio(1.91, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(Theme.cardBorder)
+        )
     }
 
     /// Wide enough to be a page image rather than an icon.
@@ -276,9 +304,19 @@ struct ClipCardView: View {
     private var footer: some View {
         VStack(alignment: item.type == .link ? .leading : .center, spacing: 2) {
             if item.type == .link {
-                Text(linkTitle)
-                    .font(.system(size: 13.5, weight: .semibold))
-                    .foregroundStyle(Theme.cardTextPrimary).lineLimit(1)
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    if let icon = linkPreview?.icon {
+                        Image(nsImage: icon)
+                            .resizable().interpolation(.high)
+                            .frame(width: 14, height: 14)
+                            .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+                            .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 2 }
+                    }
+                    Text(linkTitle)
+                        .font(.system(size: 13.5, weight: .semibold))
+                        .foregroundStyle(Theme.cardTextPrimary)
+                        .lineLimit(2)
+                }
             }
             // A path is worth reading in full, so it wraps rather than
             // collapsing to an ellipsis; everything else stays one line.
@@ -323,6 +361,10 @@ struct ClipCardView: View {
         case .text, .richText:
             return "\(item.charCount) characters"
         case .link:
+            // The domain alone; the title above already says which page.
+            if let host = LinkPreviewProvider.url(for: item)?.host {
+                return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+            }
             return (item.text ?? "").replacingOccurrences(of: "https://", with: "")
                                     .replacingOccurrences(of: "http://", with: "")
         case .file:
@@ -434,6 +476,8 @@ struct ClipCardView: View {
         } label: {
             Label(deleteMenuTitle, systemImage: "trash")
         }
+        // CleanShot's captures are deleted in CleanShot.
+        .disabled(store.source == .cleanShot)
     }
 
     private var deleteMenuTitle: String {

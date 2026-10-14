@@ -15,10 +15,10 @@ enum Theme {
 
     // Every surface color adapts to the bar's light or dark appearance, the
     // way Paste's two themes do.
-    static let panelTint = adaptive(light: NSColor.white.withAlphaComponent(0.6),
-                                    dark: NSColor.black.withAlphaComponent(0.35))
+    static let panelTint = adaptive(light: NSColor.white.withAlphaComponent(0.38),
+                                    dark: NSColor.black.withAlphaComponent(0.22))
     static let glassTint = NSColor(name: nil) { appearance in
-        isDark(appearance) ? NSColor(white: 0.08, alpha: 0.55) : NSColor.white.withAlphaComponent(0.72)
+        isDark(appearance) ? NSColor(white: 0.08, alpha: 0.32) : NSColor.white.withAlphaComponent(0.42)
     }
     static let cardBody = adaptive(light: .white, dark: NSColor(white: 0.17, alpha: 1))
     static let cardBorder = adaptive(light: NSColor.black.withAlphaComponent(0.06),

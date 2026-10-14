@@ -312,6 +312,8 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         store.barInputMode = .cards
         store.searchText = ""
         store.source = .history
+        CleanShotLibrary.shared.refresh()
+        ImageTextIndex.index(store.history + store.pinboards.flatMap(\.items) + CleanShotLibrary.shared.items)
         store.prepareForBarPresentation()
 
         // Rebuild if the panel was ever torn down - a nil window is another way the
@@ -709,6 +711,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// rather than representing a navigable section.
     private func moveBarSection(by delta: Int) {
         let sources: [BarSource] = [.history] + store.pinboards.map { .pinboard($0.id) }
+            + (CleanShotLibrary.shared.isAvailable ? [.cleanShot] : [])
         guard !sources.isEmpty else { return }
 
         let currentIndex = sources.firstIndex(of: store.source) ?? 0

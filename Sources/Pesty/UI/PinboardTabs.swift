@@ -4,6 +4,7 @@ struct PinboardTabs: View {
     @Bindable private var store = ClipboardStore.shared
     /// The tab a card is being dragged over, highlighted as a drop target.
     @State private var dropTarget: UUID?
+    private var cleanShot: CleanShotLibrary { CleanShotLibrary.shared }
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -54,6 +55,17 @@ struct PinboardTabs: View {
                             store.deletePinboard(board.id)
                         }
                     }
+                }
+
+                if cleanShot.isAvailable {
+                    pill(title: "CleanShot",
+                         dot: nil,
+                         icon: "camera.viewfinder",
+                         selected: store.source == .cleanShot) {
+                        cleanShot.refresh()
+                        store.source = .cleanShot; store.selectFirst()
+                    }
+                    .help("Your CleanShot X capture history")
                 }
 
                 Button(action: addPinboard) {

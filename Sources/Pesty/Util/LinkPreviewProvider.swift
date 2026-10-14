@@ -9,6 +9,8 @@ import LinkPresentation
 struct LinkPreview {
     let title: String?
     let image: NSImage?
+    /// The site's favicon, shown beside the title.
+    var icon: NSImage? = nil
 }
 
 @MainActor
@@ -66,11 +68,11 @@ enum LinkPreviewProvider {
         provider.timeout = fetchTimeout
         provider.shouldFetchSubresources = true
         guard let metadata = try? await provider.startFetchingMetadata(for: url) else { return nil }
-        var image = await loadImage(metadata.imageProvider)
-        if image == nil { image = await loadImage(metadata.iconProvider) }
+        let image = await loadImage(metadata.imageProvider)
+        let icon = await loadImage(metadata.iconProvider)
         let title = metadata.title?.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard image != nil || !(title ?? "").isEmpty else { return nil }
-        return LinkPreview(title: title, image: image)
+        guard image != nil || icon != nil || !(title ?? "").isEmpty else { return nil }
+        return LinkPreview(title: title, image: image, icon: icon)
     }
 
     private static func loadImage(_ provider: NSItemProvider?) async -> NSImage? {
@@ -100,9 +102,17 @@ enum LinkPreviewProvider {
 
     // MARK: Disk cache
 
+    private static func write(_ image: NSImage?, to url: URL) -> Bool {
+        guard let image, let tiff = image.tiffRepresentation,
+              let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
+        else { return false }
+        return (try? png.write(to: url, options: .atomic)) != nil
+    }
+
     private struct Record: Codable {
         let title: String?
         let hasImage: Bool
+        var hasIcon: Bool? = nil
     }
 
     private static func key(for url: URL) -> String {
@@ -115,20 +125,18 @@ enum LinkPreviewProvider {
         guard let data = try? Data(contentsOf: base.appendingPathExtension("json")),
               let record = try? JSONDecoder().decode(Record.self, from: data) else { return nil }
         let image = record.hasImage ? NSImage(contentsOf: base.appendingPathExtension("png")) : nil
-        return LinkPreview(title: record.title, image: image)
+        let icon = record.hasIcon == true
+            ? NSImage(contentsOf: base.appendingPathExtension("icon.png")) : nil
+        return LinkPreview(title: record.title, image: image, icon: icon)
     }
 
     private static func writeDisk(_ preview: LinkPreview, for url: URL) {
         let fm = FileManager.default
         try? fm.createDirectory(at: directory, withIntermediateDirectories: true)
         let base = directory.appendingPathComponent(key(for: url))
-        var hasImage = false
-        if let image = preview.image,
-           let tiff = image.tiffRepresentation,
-           let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
-            hasImage = (try? png.write(to: base.appendingPathExtension("png"), options: .atomic)) != nil
-        }
-        let record = Record(title: preview.title, hasImage: hasImage)
+        let hasImage = write(preview.image, to: base.appendingPathExtension("png"))
+        let hasIcon = write(preview.icon, to: base.appendingPathExtension("icon.png"))
+        let record = Record(title: preview.title, hasImage: hasImage, hasIcon: hasIcon)
         if let data = try? JSONEncoder().encode(record) {
             try? data.write(to: base.appendingPathExtension("json"), options: .atomic)
         }

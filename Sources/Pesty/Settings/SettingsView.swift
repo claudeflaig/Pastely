@@ -163,6 +163,10 @@ private struct GeneralSettings: View {
                 }
                 .pickerStyle(.segmented)
                 Toggle("Show link previews", isOn: $settings.linkPreviews)
+                #if !MAS
+                Toggle("Show CleanShot X history as a pinboard", isOn: $settings.showCleanShotHistory)
+                #endif
+                Toggle("Hide the bar from screen sharing and recordings", isOn: $settings.hideWhileScreenSharing)
                 Text("Link previews load the page's title and image from the site when a link is first shown.")
                     .font(.caption)
                     .foregroundStyle(.secondary)

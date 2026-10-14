@@ -79,6 +79,7 @@ final class BarWindowController: NSWindowController, NSWindowDelegate {
         // nil, which is another way to never show the bar again.
         panel.isReleasedWhenClosed = false
         panel.appearance = Settings.shared.barAppearance.nsAppearance
+        panel.sharingType = Settings.shared.hideWhileScreenSharing ? .none : .readOnly
         let content = NSHostingView(rootView: BarView(searchBridge: searchBridge))
         if #available(macOS 26.0, *) {
             let glassContent = NSView()
