@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 mkdir -p packaging
-swift scripts/IconGen.swift packaging/icon_1024.png
+swift scripts/PrepareIcon.swift packaging/AppIcon-source.png packaging/icon_1024.png
 
 ICONSET="packaging/Pastely.iconset"
 rm -rf "$ICONSET"
