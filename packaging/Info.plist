@@ -3,15 +3,15 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>Pesty</string>
+    <string>Pastely</string>
     <key>CFBundleDisplayName</key>
-    <string>Pesty</string>
+    <string>Pastely</string>
     <key>CFBundleIdentifier</key>
-    <string>com.greycorelabs.pesty</string>
+    <string>ch.claudeflaig.pastely</string>
     <key>CFBundleExecutable</key>
-    <string>Pesty</string>
+    <string>Pastely</string>
     <key>CFBundleIconFile</key>
-    <string>Pesty</string>
+    <string>Pastely</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

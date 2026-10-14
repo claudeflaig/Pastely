@@ -1,6 +1,6 @@
-# Contributing to Pesty
+# Contributing to Pastely
 
-Thanks for your interest. Pesty is a small, native macOS app with no third-party dependencies, so it's easy to get into.
+Thanks for your interest. Pastely is a small, native macOS app with no third-party dependencies, so it's easy to get into.
 
 ## Prerequisites
 
@@ -10,18 +10,18 @@ Thanks for your interest. Pesty is a small, native macOS app with no third-party
 ## Build and run
 
 ```bash
-git clone https://github.com/momenbasel/pesty.git
-cd pesty
+git clone https://github.com/claudeflaig/Pastely.git
+cd pastely
 swift build          # compile
 swift run            # run in place
-swift run Pesty --demo   # run with sample clips and the strip open (for UI work)
+swift run Pastely --demo   # run with sample clips and the strip open (for UI work)
 ```
 
 To build a distributable bundle:
 
 ```bash
 VERSION=1.0.0 BUILD=1 ./scripts/build_app.sh
-open packaging/Pesty.app
+open packaging/Pastely.app
 ```
 
 ## Architecture

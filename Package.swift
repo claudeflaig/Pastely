@@ -2,23 +2,23 @@
 import PackageDescription
 
 let package = Package(
-    name: "Pesty",
+    name: "Pastely",
     platforms: [.macOS(.v14)],
     products: [
-        .executable(name: "Pesty", targets: ["Pesty"])
+        .executable(name: "Pastely", targets: ["Pastely"])
     ],
     targets: [
         .executableTarget(
-            name: "Pesty",
-            path: "Sources/Pesty",
+            name: "Pastely",
+            path: "Sources/Pastely",
             swiftSettings: [
                 .unsafeFlags(["-parse-as-library"])
             ]
         ),
         .testTarget(
-            name: "PestyTests",
-            dependencies: ["Pesty"],
-            path: "Tests/PestyTests"
+            name: "PastelyTests",
+            dependencies: ["Pastely"],
+            path: "Tests/PastelyTests"
         )
     ],
     swiftLanguageModes: [.v5]

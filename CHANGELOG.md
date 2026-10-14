@@ -1,5 +1,7 @@
 # Changelog
 
+> Pastely ist aus Pesty hervorgegangen. Die Einträge unten bis 1.3.0 stammen aus dem Original-Projekt.
+
 All notable changes to Pesty are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
