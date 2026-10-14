@@ -7,8 +7,8 @@ import Carbon.HIToolbox
 struct HotkeyRecorderView: View {
     @Binding var keyCode: Int
     @Binding var modifiers: Int
-    /// Another shortcut this one may not duplicate.
-    var reserved: (keyCode: Int, modifiers: Int)?
+    /// Other shortcuts this one may not duplicate.
+    var reserved: [(keyCode: Int, modifiers: Int)] = []
 
     @State private var recording = false
     @State private var monitor: Any?
@@ -40,7 +40,7 @@ struct HotkeyRecorderView: View {
             if mods & (cmdKey | controlKey | optionKey) == 0 {
                 NSSound.beep(); return nil
             }
-            if let reserved, reserved.keyCode == Int(event.keyCode), reserved.modifiers == mods {
+            if reserved.contains(where: { $0.keyCode == Int(event.keyCode) && $0.modifiers == mods }) {
                 NSSound.beep(); return nil
             }
             keyCode = Int(event.keyCode)

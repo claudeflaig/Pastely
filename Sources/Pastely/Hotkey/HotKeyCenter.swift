@@ -8,12 +8,16 @@ final class HotKeyCenter {
     var onTrigger: (() -> Void)?
     /// Fired by the Paste Stack shortcut, ⇧⌘C by default as in Paste.
     var onStackTrigger: (() -> Void)?
+    /// Fired by the Paste as Plain Text shortcut, ⌥⇧⌘V by default.
+    var onPlainTextTrigger: (() -> Void)?
 
     private static let barHotKeyID: UInt32 = 1
     private static let stackHotKeyID: UInt32 = 2
+    private static let plainTextHotKeyID: UInt32 = 3
 
     private var hotKeyRef: EventHotKeyRef?
     private var stackHotKeyRef: EventHotKeyRef?
+    private var plainTextHotKeyRef: EventHotKeyRef?
     private var handlerRef: EventHandlerRef?
     private let signature: OSType = 0x50535459
 
@@ -23,6 +27,7 @@ final class HotKeyCenter {
         installHandlerIfNeeded()
         reload()
         reloadStackHotKey()
+        reloadPlainTextHotKey()
     }
 
     /// ⇧⌘C is also taken by some apps (Finder's Computer, browser inspectors),
@@ -40,6 +45,22 @@ final class HotKeyCenter {
         }
     }
 
+    /// ⌥⇧⌘V is Paste and Match Style in many apps; while this shortcut is on,
+    /// Pastely takes it over everywhere, so it can be changed or turned off.
+    func reloadPlainTextHotKey() {
+        if let ref = plainTextHotKeyRef { UnregisterEventHotKey(ref); plainTextHotKeyRef = nil }
+        #if !MAS
+        guard Settings.shared.plainTextPasteShortcut else { return }
+        let id = EventHotKeyID(signature: signature, id: Self.plainTextHotKeyID)
+        var ref: EventHotKeyRef?
+        if RegisterEventHotKey(UInt32(Settings.shared.plainTextPasteKeyCode),
+                               UInt32(Settings.shared.plainTextPasteModifiers), id,
+                               GetApplicationEventTarget(), 0, &ref) == noErr {
+            plainTextHotKeyRef = ref
+        }
+        #endif
+    }
+
     private func installHandlerIfNeeded() {
         guard handlerRef == nil else { return }
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard),
@@ -53,6 +74,8 @@ final class HotKeyCenter {
             DispatchQueue.main.async {
                 if id == HotKeyCenter.stackHotKeyID {
                     HotKeyCenter.shared.onStackTrigger?()
+                } else if id == HotKeyCenter.plainTextHotKeyID {
+                    HotKeyCenter.shared.onPlainTextTrigger?()
                 } else {
                     HotKeyCenter.shared.onTrigger?()
                 }

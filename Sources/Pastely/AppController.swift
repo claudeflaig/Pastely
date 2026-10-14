@@ -53,6 +53,10 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         HotKeyCenter.shared.onTrigger = { [weak self] in self?.toggleBar() }
         HotKeyCenter.shared.onStackTrigger = { PasteStack.shared.toggle() }
         #if !MAS
+        HotKeyCenter.shared.onPlainTextTrigger = { [weak self] in
+            guard let self else { return }
+            PasteService.pasteClipboardAsPlainText(monitor: self.monitor)
+        }
         TextExpander.shared.refresh()
         #endif
         HotKeyCenter.shared.start()

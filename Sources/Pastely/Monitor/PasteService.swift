@@ -144,6 +144,43 @@ enum PasteService {
         up.post(tap: .cghidEventTap)
     }
 
+    /// Pastes what is on the clipboard now without its formatting, then puts
+    /// the original back, so the next ⌘V still pastes it formatted.
+    static func pasteClipboardAsPlainText(monitor: ClipboardMonitor) {
+        let pasteboard = NSPasteboard.general
+        guard let text = pasteboard.string(forType: .string) else { NSSound.beep(); return }
+        guard ensureAccessibility(prompt: true) else { return }
+        let saved = snapshotPasteboard()
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+        monitor.suppressUntilChangeCount = pasteboard.changeCount
+        sendCommandV()
+        // Restore what was on the clipboard once the paste has been read.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            monitor.suppressUntilChangeCount = restorePasteboard(saved)
+        }
+    }
+
+    static func snapshotPasteboard() -> [[NSPasteboard.PasteboardType: Data]] {
+        (NSPasteboard.general.pasteboardItems ?? []).map { item in
+            var data: [NSPasteboard.PasteboardType: Data] = [:]
+            for type in item.types { data[type] = item.data(forType: type) }
+            return data
+        }
+    }
+
+    static func restorePasteboard(_ items: [[NSPasteboard.PasteboardType: Data]]) -> Int {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        let restored = items.map { entry -> NSPasteboardItem in
+            let item = NSPasteboardItem()
+            for (type, data) in entry { item.setData(data, forType: type) }
+            return item
+        }
+        if !restored.isEmpty { pasteboard.writeObjects(restored) }
+        return pasteboard.changeCount
+    }
+
     @discardableResult
     static func ensureAccessibility(prompt: Bool) -> Bool {
         let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String

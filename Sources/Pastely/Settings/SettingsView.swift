@@ -549,16 +549,30 @@ private struct ShortcutSettings: View {
                 SettingsRow(title: "Show Pastely") {
                     HotkeyRecorderView(keyCode: $settings.hotkeyKeyCode,
                                        modifiers: $settings.hotkeyModifiers,
-                                       reserved: (settings.pasteStackKeyCode, settings.pasteStackModifiers))
+                                       reserved: [(settings.pasteStackKeyCode, settings.pasteStackModifiers), (settings.plainTextPasteKeyCode, settings.plainTextPasteModifiers)])
                 }
                 SettingsRow(title: "Open or close the Paste Stack") {
                     HotkeyRecorderView(keyCode: $settings.pasteStackKeyCode,
                                        modifiers: $settings.pasteStackModifiers,
-                                       reserved: (settings.hotkeyKeyCode, settings.hotkeyModifiers))
+                                       reserved: [(settings.hotkeyKeyCode, settings.hotkeyModifiers), (settings.plainTextPasteKeyCode, settings.plainTextPasteModifiers)])
                         .disabled(!settings.pasteStackShortcut)
                         .opacity(settings.pasteStackShortcut ? 1 : 0.5)
                 }
             }
+
+            #if !MAS
+            SettingsCard(title: "Paste as Plain Text",
+                         footer: "Pastes what is on the clipboard without fonts, colors or links, in any app. The clipboard keeps its formatting. Many apps use ⌥⇧⌘V for Paste and Match Style; while this is on, Pastely handles it everywhere. Needs the Accessibility permission.") {
+                SettingsToggle(title: "Enable the plain text shortcut", isOn: $settings.plainTextPasteShortcut)
+                SettingsRow(title: "Shortcut") {
+                    HotkeyRecorderView(keyCode: $settings.plainTextPasteKeyCode,
+                                       modifiers: $settings.plainTextPasteModifiers,
+                                       reserved: [(settings.hotkeyKeyCode, settings.hotkeyModifiers), (settings.pasteStackKeyCode, settings.pasteStackModifiers)])
+                        .disabled(!settings.plainTextPasteShortcut)
+                        .opacity(settings.plainTextPasteShortcut ? 1 : 0.5)
+                }
+            }
+            #endif
 
             #if !MAS
             SettingsCard(title: "Abbreviations",
@@ -634,7 +648,7 @@ private struct PasteStackSettings: View {
                 SettingsRow(title: "Shortcut") {
                     HotkeyRecorderView(keyCode: $settings.pasteStackKeyCode,
                                        modifiers: $settings.pasteStackModifiers,
-                                       reserved: (settings.hotkeyKeyCode, settings.hotkeyModifiers))
+                                       reserved: [(settings.hotkeyKeyCode, settings.hotkeyModifiers), (settings.plainTextPasteKeyCode, settings.plainTextPasteModifiers)])
                         .disabled(!settings.pasteStackShortcut)
                         .opacity(settings.pasteStackShortcut ? 1 : 0.5)
                 }

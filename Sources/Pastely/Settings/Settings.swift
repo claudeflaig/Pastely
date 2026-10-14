@@ -303,6 +303,9 @@ final class Settings {
         static let tabMemory = "tabMemory"
         static let pasteStackKeyCode = "pasteStackKeyCode"
         static let pasteStackModifiers = "pasteStackModifiers"
+        static let plainTextPasteShortcut = "plainTextPasteShortcut"
+        static let plainTextPasteKeyCode = "plainTextPasteKeyCode"
+        static let plainTextPasteModifiers = "plainTextPasteModifiers"
     }
 
     var historyLimit: Int {
@@ -520,6 +523,35 @@ final class Settings {
         HotKeyCenter.describe(keyCode: pasteStackKeyCode, modifiers: pasteStackModifiers)
     }
 
+    /// Pastes the clipboard without formatting from anywhere.
+    var plainTextPasteShortcut: Bool {
+        didSet {
+            guard isLoaded else { return }
+            d.set(plainTextPasteShortcut, forKey: Keys.plainTextPasteShortcut)
+            HotKeyCenter.shared.reloadPlainTextHotKey()
+        }
+    }
+
+    var plainTextPasteKeyCode: Int {
+        didSet {
+            guard isLoaded else { return }
+            d.set(plainTextPasteKeyCode, forKey: Keys.plainTextPasteKeyCode)
+            HotKeyCenter.shared.reloadPlainTextHotKey()
+        }
+    }
+
+    var plainTextPasteModifiers: Int {
+        didSet {
+            guard isLoaded else { return }
+            d.set(plainTextPasteModifiers, forKey: Keys.plainTextPasteModifiers)
+            HotKeyCenter.shared.reloadPlainTextHotKey()
+        }
+    }
+
+    var plainTextPasteHotkeyDisplay: String {
+        HotKeyCenter.describe(keyCode: plainTextPasteKeyCode, modifiers: plainTextPasteModifiers)
+    }
+
     private init() {
         d.register(defaults: [
             Keys.historyLimit: 500,
@@ -559,7 +591,10 @@ final class Settings {
             Keys.expandAbbreviations: true,
             Keys.tabMemory: TabMemory.fifteenMinutes.rawValue,
             Keys.pasteStackKeyCode: kVK_ANSI_C,
-            Keys.pasteStackModifiers: cmdKey | shiftKey
+            Keys.pasteStackModifiers: cmdKey | shiftKey,
+            Keys.plainTextPasteShortcut: true,
+            Keys.plainTextPasteKeyCode: kVK_ANSI_V,
+            Keys.plainTextPasteModifiers: cmdKey | optionKey | shiftKey
         ])
         historyLimit = d.integer(forKey: Keys.historyLimit)
         historyRetentionMode = HistoryRetentionMode(rawValue: d.string(forKey: Keys.historyRetentionMode) ?? "")
@@ -601,6 +636,9 @@ final class Settings {
         tabMemory = TabMemory(rawValue: d.integer(forKey: Keys.tabMemory)) ?? .fifteenMinutes
         pasteStackKeyCode = d.integer(forKey: Keys.pasteStackKeyCode)
         pasteStackModifiers = d.integer(forKey: Keys.pasteStackModifiers)
+        plainTextPasteShortcut = d.bool(forKey: Keys.plainTextPasteShortcut)
+        plainTextPasteKeyCode = d.integer(forKey: Keys.plainTextPasteKeyCode)
+        plainTextPasteModifiers = d.integer(forKey: Keys.plainTextPasteModifiers)
         isLoaded = true
         if normalizedBarHeight != storedBarHeight {
             d.set(normalizedBarHeight, forKey: Keys.barHeight)

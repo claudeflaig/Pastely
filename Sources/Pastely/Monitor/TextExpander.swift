@@ -93,7 +93,7 @@ final class TextExpander {
 
     private func expand(_ clip: ClipItem, replacing count: Int) {
         expanding = true
-        let saved = Self.snapshotPasteboard()
+        let saved = PasteService.snapshotPasteboard()
         Self.post(keyCode: CGKeyCode(kVK_Delete), times: count)
         let monitor = AppController.shared.monitor
         // Give the app a moment to apply the backspaces before pasting.
@@ -102,7 +102,7 @@ final class TextExpander {
             PasteService.sendCommandV()
             // Restore what was on the clipboard once the paste has been read.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                monitor.suppressUntilChangeCount = Self.restorePasteboard(saved)
+                monitor.suppressUntilChangeCount = PasteService.restorePasteboard(saved)
                 self.expanding = false
             }
         }
@@ -114,26 +114,6 @@ final class TextExpander {
             CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true)?.post(tap: .cghidEventTap)
             CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)?.post(tap: .cghidEventTap)
         }
-    }
-
-    private static func snapshotPasteboard() -> [[NSPasteboard.PasteboardType: Data]] {
-        (NSPasteboard.general.pasteboardItems ?? []).map { item in
-            var data: [NSPasteboard.PasteboardType: Data] = [:]
-            for type in item.types { data[type] = item.data(forType: type) }
-            return data
-        }
-    }
-
-    private static func restorePasteboard(_ items: [[NSPasteboard.PasteboardType: Data]]) -> Int {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        let restored = items.map { entry -> NSPasteboardItem in
-            let item = NSPasteboardItem()
-            for (type, data) in entry { item.setData(data, forType: type) }
-            return item
-        }
-        if !restored.isEmpty { pasteboard.writeObjects(restored) }
-        return pasteboard.changeCount
     }
 }
 #endif
