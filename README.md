@@ -27,7 +27,7 @@ swift build && .build/debug/Pastely --demo
 `--demo` füllt die Leiste mit Beispielkarten. Als richtige App:
 
 ```bash
-bash scripts/build_app.sh && open packaging/Pastely.app
+bash scripts/build_app.sh && open /Applications/Pastely.app
 ```
 
 Damit Pastely direkt in andere Apps einfügen und den Paste Stack weiterschalten kann, braucht es die Berechtigung **Bedienungshilfen**.

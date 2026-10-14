@@ -4,7 +4,12 @@ cd "$(dirname "$0")/.."
 
 VERSION="${VERSION:-1.0.0}"
 BUILD="${BUILD:-1}"
-APP="packaging/Pastely.app"
+# Assembled and signed outside the project: iCloud Drive (e.g. a Documents
+# folder) tags files with attributes that codesign refuses. INSTALL_DIR is
+# where the finished app goes.
+STAGE="$(mktemp -d)"
+APP="$STAGE/Pastely.app"
+INSTALL_DIR="${INSTALL_DIR:-/Applications}"
 
 echo "==> Building universal release binary (arm64 + x86_64)"
 swift build -c release --arch arm64 --arch x86_64
@@ -41,6 +46,13 @@ else
     -r='designated => identifier "ch.claudeflaig.pastely"' "$APP"
 fi
 
+echo "==> Installing to $INSTALL_DIR/Pastely.app"
+rm -rf "$INSTALL_DIR/Pastely.app"
+ditto "$APP" "$INSTALL_DIR/Pastely.app"
+rm -rf "$STAGE"
+APP="$INSTALL_DIR/Pastely.app"
+
 echo "==> Built $APP"
+/usr/bin/codesign --verify "$APP" && echo "    signature ok"
 /usr/bin/file "$APP/Contents/MacOS/Pastely"
 echo "    version $VERSION ($BUILD)"

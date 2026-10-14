@@ -21,7 +21,7 @@ To build a distributable bundle:
 
 ```bash
 VERSION=1.0.0 BUILD=1 ./scripts/build_app.sh
-open packaging/Pastely.app
+open /Applications/Pastely.app
 ```
 
 ## Architecture
