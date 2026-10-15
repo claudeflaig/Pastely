@@ -4,8 +4,8 @@ import QuickLookThumbnailing
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// A small window that collects new copies and new files from folder tabs,
-/// as Dropover's shelf does. It stays until it is closed or emptied: drag
+/// A small window that collects new copies and new files from watched
+/// folders. It stays until it is closed or emptied: drag
 /// the stack out to use everything, or open it to drag items one by one.
 /// It can be moved anywhere and opens there again.
 @MainActor
