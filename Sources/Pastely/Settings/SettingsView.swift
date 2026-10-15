@@ -658,12 +658,12 @@ private struct ShortcutSettings: View {
                 SettingsRow(title: "Show Pastely") {
                     HotkeyRecorderView(keyCode: $settings.hotkeyKeyCode,
                                        modifiers: $settings.hotkeyModifiers,
-                                       reserved: [(settings.pasteStackKeyCode, settings.pasteStackModifiers), (settings.plainTextPasteKeyCode, settings.plainTextPasteModifiers)])
+                                       reserved: [(settings.pasteStackKeyCode, settings.pasteStackModifiers), (settings.plainTextPasteKeyCode, settings.plainTextPasteModifiers), (settings.captureTextKeyCode, settings.captureTextModifiers)])
                 }
                 SettingsRow(title: "Open or close the Paste Stack") {
                     HotkeyRecorderView(keyCode: $settings.pasteStackKeyCode,
                                        modifiers: $settings.pasteStackModifiers,
-                                       reserved: [(settings.hotkeyKeyCode, settings.hotkeyModifiers), (settings.plainTextPasteKeyCode, settings.plainTextPasteModifiers)])
+                                       reserved: [(settings.hotkeyKeyCode, settings.hotkeyModifiers), (settings.plainTextPasteKeyCode, settings.plainTextPasteModifiers), (settings.captureTextKeyCode, settings.captureTextModifiers)])
                         .disabled(!settings.pasteStackShortcut)
                         .opacity(settings.pasteStackShortcut ? 1 : 0.5)
                 }
@@ -676,9 +676,27 @@ private struct ShortcutSettings: View {
                 SettingsRow(title: "Shortcut") {
                     HotkeyRecorderView(keyCode: $settings.plainTextPasteKeyCode,
                                        modifiers: $settings.plainTextPasteModifiers,
-                                       reserved: [(settings.hotkeyKeyCode, settings.hotkeyModifiers), (settings.pasteStackKeyCode, settings.pasteStackModifiers)])
+                                       reserved: [(settings.hotkeyKeyCode, settings.hotkeyModifiers), (settings.pasteStackKeyCode, settings.pasteStackModifiers), (settings.captureTextKeyCode, settings.captureTextModifiers)])
                         .disabled(!settings.plainTextPasteShortcut)
                         .opacity(settings.plainTextPasteShortcut ? 1 : 0.5)
+                }
+            }
+            #endif
+
+            #if !MAS
+            SettingsCard(title: "Capture Text",
+                         footer: "Drag over any part of the screen, like a photo, a video or a PDF, and the text in it is copied and kept as a clip. Recognition runs on this Mac. The first time, macOS asks for the Screen Recording permission. Press Esc to cancel.") {
+                SettingsToggle(title: "Enable the capture text shortcut", isOn: $settings.captureTextShortcut)
+                SettingsRow(title: "Shortcut") {
+                    HotkeyRecorderView(keyCode: $settings.captureTextKeyCode,
+                                       modifiers: $settings.captureTextModifiers,
+                                       reserved: [(settings.hotkeyKeyCode, settings.hotkeyModifiers), (settings.pasteStackKeyCode, settings.pasteStackModifiers), (settings.plainTextPasteKeyCode, settings.plainTextPasteModifiers)])
+                        .disabled(!settings.captureTextShortcut)
+                        .opacity(settings.captureTextShortcut ? 1 : 0.5)
+                }
+                SettingsRow(title: "Capture now") {
+                    Button("Capture Text") { AppController.shared.captureScreenText() }
+                        .controlSize(.small)
                 }
             }
             #endif
@@ -757,7 +775,7 @@ private struct PasteStackSettings: View {
                 SettingsRow(title: "Shortcut") {
                     HotkeyRecorderView(keyCode: $settings.pasteStackKeyCode,
                                        modifiers: $settings.pasteStackModifiers,
-                                       reserved: [(settings.hotkeyKeyCode, settings.hotkeyModifiers), (settings.plainTextPasteKeyCode, settings.plainTextPasteModifiers)])
+                                       reserved: [(settings.hotkeyKeyCode, settings.hotkeyModifiers), (settings.plainTextPasteKeyCode, settings.plainTextPasteModifiers), (settings.captureTextKeyCode, settings.captureTextModifiers)])
                         .disabled(!settings.pasteStackShortcut)
                         .opacity(settings.pasteStackShortcut ? 1 : 0.5)
                 }

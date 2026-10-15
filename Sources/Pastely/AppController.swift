@@ -62,6 +62,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
             guard let self else { return }
             PasteService.pasteClipboardAsPlainText(monitor: self.monitor)
         }
+        HotKeyCenter.shared.onCaptureTextTrigger = { [weak self] in self?.captureScreenText() }
         TextExpander.shared.refresh()
         #endif
         HotKeyCenter.shared.start()
@@ -222,6 +223,9 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         menu.addItem(withTitle: "Open Pastely   \(Settings.shared.hotkeyDisplay)",
                      action: #selector(menuOpen), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Paste Stack   \(Settings.shared.pasteStackHotkeyDisplay)", action: #selector(menuPasteStack), keyEquivalent: "").target = self
+        #if !MAS
+        menu.addItem(withTitle: "Capture Text   \(Settings.shared.captureTextHotkeyDisplay)", action: #selector(menuCaptureText), keyEquivalent: "").target = self
+        #endif
         menu.addItem(.separator())
         menu.addItem(withTitle: "Settings…", action: #selector(menuSettings), keyEquivalent: ",").target = self
         let pause = menu.addItem(withTitle: "Pause Pastely", action: #selector(menuTogglePause), keyEquivalent: "")
@@ -247,6 +251,9 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc private func menuOpen() { showBar() }
     @objc private func menuPasteStack() { PasteStack.shared.toggle() }
+    #if !MAS
+    @objc private func menuCaptureText() { captureScreenText() }
+    #endif
     @objc private func menuSettings() { showSettings() }
     @objc private func menuClear() { store.clearHistory() }
     @objc private func menuTogglePause() { togglePastelyPause() }
@@ -479,6 +486,25 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         copyToast.show(message: "Copied. Grant Accessibility in System Settings to paste directly.",
                        symbol: "exclamationmark.triangle.fill",
                        linger: 4)
+    }
+    #endif
+
+    #if !MAS
+    /// Drag over any part of the screen to copy the text in it.
+    func captureScreenText() {
+        hideBar()
+        ScreenTextCapture.start { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .copied(let text):
+                let lines = text.split(separator: "\n").count
+                self.copyToast.show(message: lines == 1 ? "Text Copied" : "\(lines) Lines Copied",
+                                    symbol: "text.viewfinder")
+                if Settings.shared.playSoundOnCopy { NSSound(named: "Tink")?.play() }
+            case .noText:
+                self.copyToast.show(message: "No Text Found", symbol: "text.viewfinder", linger: 1.6)
+            }
+        }
     }
     #endif
 
