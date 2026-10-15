@@ -69,6 +69,14 @@ final class PasteStack {
         stageNext()
     }
 
+    /// Puts a card where another one is; a clip dragged in from the bar
+    /// joins the stack at that spot.
+    func move(_ item: ClipItem, onto target: ClipItem) {
+        if !queue.items.contains(where: { $0.id == item.id }) { queue.add(item) }
+        queue.move(id: item.id, onto: target.id)
+        stageNext()
+    }
+
     func remove(_ item: ClipItem) {
         queue.remove(id: item.id)
         stageNext()
@@ -133,7 +141,8 @@ final class PasteStackPanelController {
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
-        panel.isMovableByWindowBackground = true
+        // Moved from empty space only, so dragging a card reorders the stack.
+        panel.isMovableByWindowBackground = false
         panel.contentView = NSHostingView(rootView: PasteStackView())
         return panel
     }()
@@ -171,17 +180,22 @@ final class PasteStackPanelController {
 struct PasteStackView: View {
     @Bindable private var stack = PasteStack.shared
     @State private var dropTargeted = false
+    /// The card a dragged card hovers over.
+    @State private var dropTarget: UUID?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            header
-            if stack.queue.isEmpty {
-                emptyState
-            } else {
-                cards
+        ZStack {
+            WindowDragArea()
+            VStack(alignment: .leading, spacing: 10) {
+                header
+                if stack.queue.isEmpty {
+                    emptyState
+                } else {
+                    cards
+                }
             }
+            .padding(14)
         }
-        .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background {
             ZStack {
@@ -270,6 +284,23 @@ struct PasteStackView: View {
                     ForEach(Array(stack.queue.pasteOrder.enumerated()), id: \.element.id) { index, item in
                         PasteStackCard(item: item, position: index + 1, isNext: index == 0)
                             .id(item.id)
+                            .overlay {
+                                if dropTarget == item.id {
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .strokeBorder(Theme.selection, lineWidth: 2)
+                                }
+                            }
+                            // Drag a card onto another to change the order.
+                            .onDrag { ClipDragProvider.make(for: item) }
+                            .onDrop(of: [.item], isTargeted: Binding(
+                                get: { dropTarget == item.id },
+                                set: { dropTarget = $0 ? item.id : (dropTarget == item.id ? nil : dropTarget) }
+                            )) { _ in
+                                guard let dragged = ClipDragProvider.recentlyDraggedItem else { return false }
+                                ClipDragProvider.clearDraggedItem()
+                                stack.move(dragged, onto: item)
+                                return true
+                            }
                             .contextMenu {
                                 Button(role: .destructive) {
                                     stack.remove(item)

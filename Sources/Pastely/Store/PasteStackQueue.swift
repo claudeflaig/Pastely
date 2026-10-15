@@ -22,6 +22,17 @@ struct PasteStackQueue: Equatable {
         items.append(item)
     }
 
+    /// Puts a clip where another one is in the paste order, shifting the rest
+    /// along, so a dragged card lands on the spot it was dropped.
+    mutating func move(id: UUID, onto targetID: UUID) {
+        var order = pasteOrder
+        guard id != targetID,
+              let from = order.firstIndex(where: { $0.id == id }),
+              let to = order.firstIndex(where: { $0.id == targetID }) else { return }
+        order.insert(order.remove(at: from), at: to)
+        items = reversed ? order.reversed() : order
+    }
+
     mutating func remove(id: UUID) {
         items.removeAll { $0.id == id }
     }

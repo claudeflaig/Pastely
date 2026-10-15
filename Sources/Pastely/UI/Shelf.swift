@@ -721,7 +721,7 @@ private final class ClosureMenuItem: NSMenuItem {
 }
 
 /// Empty space that moves the window, as a title bar would.
-private struct WindowDragArea: NSViewRepresentable {
+struct WindowDragArea: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView { MoveView() }
     func updateNSView(_ nsView: NSView, context: Context) {}
 

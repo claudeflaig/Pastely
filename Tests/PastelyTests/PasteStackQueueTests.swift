@@ -42,3 +42,28 @@ final class PasteStackQueueTests: XCTestCase {
         XCTAssertNil(queue.next)
     }
 }
+
+final class PasteStackReorderTests: XCTestCase {
+    private func clip(_ text: String) -> ClipItem { ClipItem(type: .text, text: text) }
+
+    func testDraggedCardTakesTheDropSpot() {
+        var queue = PasteStackQueue()
+        let a = clip("a"), b = clip("b"), c = clip("c")
+        [a, b, c].forEach { queue.add($0) }
+        queue.move(id: c.id, onto: a.id)
+        XCTAssertEqual(queue.pasteOrder.map(\.text), ["c", "a", "b"])
+        queue.move(id: c.id, onto: b.id)
+        XCTAssertEqual(queue.pasteOrder.map(\.text), ["a", "b", "c"])
+    }
+
+    func testReorderFollowsThePasteOrderWhenReversed() {
+        var queue = PasteStackQueue()
+        let a = clip("a"), b = clip("b"), c = clip("c")
+        [a, b, c].forEach { queue.add($0) }
+        queue.reversed = true
+        XCTAssertEqual(queue.pasteOrder.map(\.text), ["c", "b", "a"])
+        queue.move(id: a.id, onto: c.id)
+        XCTAssertEqual(queue.pasteOrder.map(\.text), ["a", "c", "b"])
+        XCTAssertEqual(queue.next?.text, "a")
+    }
+}
