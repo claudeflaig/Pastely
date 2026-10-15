@@ -213,12 +213,12 @@ struct ShelfView: View {
     private var collapsed: some View {
         VStack(spacing: 10) {
             ZStack {
-                let shown = Array(model.items.suffix(3))
-                ForEach(Array(shown.enumerated()), id: \.element.id) { index, item in
+                let shown = Array(ShelfStackCard.cards(for: model.items).suffix(4))
+                ForEach(Array(shown.enumerated()), id: \.element.id) { index, card in
                     let fromTop = shown.count - 1 - index
-                    ShelfThumbnail(item: item, side: 84)
-                        .rotationEffect(.degrees(fromTop == 0 ? 0 : (fromTop == 1 ? -7 : 6)))
-                        .offset(x: fromTop == 0 ? 0 : (fromTop == 1 ? -6 : 7), y: CGFloat(fromTop) * -3)
+                    ShelfStackCard(card: card, side: 84)
+                        .rotationEffect(.degrees(ShelfStackCard.rotations[fromTop]))
+                        .offset(ShelfStackCard.offsets[fromTop])
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -231,10 +231,11 @@ struct ShelfView: View {
             .help("Drag everything into an app, or click to see each item")
 
             Button { model.expanded = true } label: {
-                HStack(spacing: 6) {
+                HStack(spacing: 5) {
                     Text(ShelfModel.title(for: model.items))
+                        .font(.system(size: 11.5, weight: .regular))
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.system(size: 9, weight: .medium))
                         .foregroundStyle(Theme.chromeTextSecondary)
                 }
             }
@@ -381,6 +382,85 @@ private struct HeaderButtonLabel: View {
     }
 }
 
+/// One card of the collapsed stack. Every card gets the same rounded page
+/// with a hairline edge and its own shadow, so several files read as a pile,
+/// as in Dropover, even when their previews look alike.
+struct ShelfStackCard: View {
+    struct Card: Identifiable {
+        let id: String
+        let item: ClipItem
+        let url: URL?
+    }
+
+    /// The top card lies straight, the ones below fan out a little more each.
+    static let rotations: [Double] = [0, -6, 5, -10]
+    static let offsets: [CGSize] = [.zero, CGSize(width: -5, height: 2),
+                                    CGSize(width: 6, height: 3), CGSize(width: -8, height: 4)]
+
+    /// A clip holding several files shows a card for each file.
+    @MainActor
+    static func cards(for items: [ClipItem]) -> [Card] {
+        items.flatMap { item -> [Card] in
+            let urls = ShelfModel.fileURLs(of: [item])
+            guard item.type == .file, urls.count > 1 else {
+                return [Card(id: item.id.uuidString, item: item, url: urls.first)]
+            }
+            return urls.map { Card(id: item.id.uuidString + $0.path, item: item, url: $0) }
+        }
+    }
+
+    let card: Card
+    let side: CGFloat
+    @State private var image: NSImage?
+
+    private var isPicture: Bool {
+        card.item.type == .image || ClipPreviewProvider.imageFileURL(for: card.item) != nil
+    }
+
+    var body: some View {
+        Group {
+            if card.item.type == .color || (card.url == nil && card.item.type != .text
+                                            && card.item.type != .richText && card.item.type != .link) {
+                ShelfThumbnail(item: card.item, side: side)
+            } else if let image, isPicture {
+                Image(nsImage: image)
+                    .resizable().interpolation(.high).scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(.black.opacity(0.12), lineWidth: 0.5))
+                    .shadow(color: .black.opacity(0.35), radius: 3, y: 1.5)
+                    .frame(width: side, height: side)
+            } else {
+                page
+            }
+        }
+        .task(id: card.id) {
+            guard let url = card.url else { return }
+            image = await ShelfThumbnails.image(for: url, side: side)
+        }
+    }
+
+    /// A portrait sheet: the file's preview from the top, or the clip's text.
+    private var page: some View {
+        let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
+        return ZStack(alignment: .topLeading) {
+            Color.white
+            if let image {
+                Image(nsImage: image)
+                    .resizable().interpolation(.high).scaledToFill()
+                    .frame(width: side * 0.72, height: side * 0.92, alignment: .topLeading)
+                    .clipped()
+            } else if card.url == nil {
+                ShelfThumbnail(item: card.item, side: side)
+            }
+        }
+        .frame(width: side * 0.72, height: side * 0.92)
+        .clipShape(shape)
+        .overlay(shape.strokeBorder(.black.opacity(0.14), lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.3), radius: 3, y: 1.5)
+    }
+}
+
 /// A file's QuickLook thumbnail, a picture, a sheet of text or a color.
 struct ShelfThumbnail: View {
     let item: ClipItem
@@ -450,6 +530,10 @@ enum ShelfThumbnails {
 
     static func image(for item: ClipItem, side: CGFloat) async -> NSImage? {
         guard let url = ShelfModel.fileURLs(of: [item]).first else { return nil }
+        return await image(for: url, side: side)
+    }
+
+    static func image(for url: URL, side: CGFloat) async -> NSImage? {
         let key = "\(url.path)|\(Int(side))" as NSString
         if let cached = cache.object(forKey: key) { return cached }
         let scale = NSScreen.main?.backingScaleFactor ?? 2
