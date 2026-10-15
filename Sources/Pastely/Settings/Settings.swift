@@ -288,6 +288,7 @@ final class Settings {
         static let shelfForClips = "shelfForClips"
         static let shelfForFolders = "shelfForFolders"
         static let shelfKinds = "shelfKinds"
+        static let shelfWatchedFolders = "shelfWatchedFolders"
         static let shelfRemoveAfterDrag = "shelfRemoveAfterDrag"
         static let shelfTextAsFile = "shelfTextAsFile"
         static let promoteOnPaste = "promoteOnPaste"
@@ -410,7 +411,21 @@ final class Settings {
 
     /// Puts each file that lands in a folder tab, such as a download, on the Shelf.
     var shelfForFolders: Bool {
-        didSet { guard isLoaded else { return }; d.set(shelfForFolders, forKey: Keys.shelfForFolders) }
+        didSet {
+            guard isLoaded else { return }
+            d.set(shelfForFolders, forKey: Keys.shelfForFolders)
+            FolderLibrary.shared.syncWatchers()
+        }
+    }
+
+    /// The folders whose new files go on the Shelf, by path; independent of
+    /// the folder tabs. Downloads by default.
+    var shelfWatchedFolders: [String] {
+        didSet {
+            guard isLoaded else { return }
+            d.set(shelfWatchedFolders, forKey: Keys.shelfWatchedFolders)
+            FolderLibrary.shared.syncWatchers()
+        }
     }
 
     /// Which kinds of copies go on the Shelf, as `ClipType` raw values.
@@ -632,6 +647,7 @@ final class Settings {
             Keys.captureSoundName: "Glass",
             Keys.shelfForClips: true,
             Keys.shelfForFolders: true,
+            Keys.shelfWatchedFolders: [Settings.downloadsPath],
             Keys.shelfKinds: [ClipType.text, .link, .image, .file, .color].map(\.rawValue),
             Keys.shelfRemoveAfterDrag: true,
             Keys.shelfTextAsFile: true,
@@ -681,6 +697,7 @@ final class Settings {
         shelfForClips = d.bool(forKey: Keys.shelfForClips)
         shelfForFolders = d.bool(forKey: Keys.shelfForFolders)
         shelfKinds = Set(d.stringArray(forKey: Keys.shelfKinds) ?? [])
+        shelfWatchedFolders = d.stringArray(forKey: Keys.shelfWatchedFolders) ?? []
         shelfRemoveAfterDrag = d.bool(forKey: Keys.shelfRemoveAfterDrag)
         shelfTextAsFile = d.bool(forKey: Keys.shelfTextAsFile)
         promoteOnPaste = d.bool(forKey: Keys.promoteOnPaste)

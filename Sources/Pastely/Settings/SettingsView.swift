@@ -566,9 +566,49 @@ private struct ShelfSettings: View {
                         .disabled(!settings.shelfForClips)
                         .opacity(settings.shelfForClips ? 1 : 0.5)
                 }
-                SettingsToggle(title: "New files in folder tabs",
-                               detail: "For example each finished download. Add folders with the + next to the tabs.",
-                               isOn: $settings.shelfForFolders)
+            }
+
+            SettingsCard(title: "Watched folders",
+                         footer: "Each file that lands in one of these folders, such as a finished download, goes on the Shelf. Hidden files and downloads still in progress are skipped.") {
+                SettingsToggle(title: "New files in watched folders", isOn: $settings.shelfForFolders)
+                ForEach(settings.shelfWatchedFolders, id: \.self) { path in
+                    HStack(spacing: 10) {
+                        Image(nsImage: NSWorkspace.shared.icon(forFile: path))
+                            .resizable().frame(width: 22, height: 22)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(FolderLibrary.title(for: path)).font(.system(size: 13))
+                            Text((path as NSString).abbreviatingWithTildeInPath)
+                                .font(.system(size: 11)).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button {
+                            settings.shelfWatchedFolders.removeAll { $0 == path }
+                        } label: {
+                            Image(systemName: "minus.circle.fill").foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Stop watching this folder")
+                    }
+                    .padding(.vertical, 2)
+                    .disabled(!settings.shelfForFolders)
+                    .opacity(settings.shelfForFolders ? 1 : 0.5)
+                }
+                HStack(spacing: 10) {
+                    Button { FolderLibrary.shared.chooseWatchedFolders() } label: {
+                        Label("Add Folder…", systemImage: "plus")
+                    }
+                    let tabFolders = settings.pinnedFolders.filter { !settings.shelfWatchedFolders.contains($0) }
+                    if !tabFolders.isEmpty {
+                        Menu("Add a Folder Tab") {
+                            ForEach(tabFolders, id: \.self) { path in
+                                Button(FolderLibrary.title(for: path)) { settings.shelfWatchedFolders.append(path) }
+                            }
+                        }
+                        .fixedSize()
+                    }
+                }
+                .controlSize(.small)
+                .disabled(!settings.shelfForFolders)
             }
 
             SettingsCard(title: "Dragging out") {

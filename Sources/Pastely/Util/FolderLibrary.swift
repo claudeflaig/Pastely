@@ -43,22 +43,23 @@ final class FolderLibrary {
         let added = panel.urls.map(\.path).filter { !Settings.shared.pinnedFolders.contains($0) }
         Settings.shared.pinnedFolders.append(contentsOf: added)
         for path in added { refresh(path) }
-        syncWatchers()
         return added.first
     }
 
     func remove(_ path: String) {
         Settings.shared.pinnedFolders.removeAll { $0 == path }
         contents[path] = nil
-        syncWatchers()
     }
 
     // MARK: - Watching for new files
 
-    /// Watches every folder tab for files that arrive, such as a finished
+    /// Watches the Shelf's folders for files that arrive, such as a finished
     /// download, and reports each one through `onNewFile`.
     func syncWatchers() {
-        let wanted = Set(folders)
+        let settings = Settings.shared
+        let wanted = settings.shelfForFolders
+            ? Set(settings.shelfWatchedFolders.filter { FileManager.default.fileExists(atPath: $0) })
+            : []
         for (path, source) in watchers where !wanted.contains(path) {
             source.cancel()
             watchers[path] = nil
@@ -91,13 +92,24 @@ final class FolderLibrary {
         let added = now.subtracting(known[path] ?? [])
         known[path] = now
         guard !added.isEmpty else { return }
-        refresh(path)
-        let arrived = Self.newArrivals(added)
-        for item in items(in: path) {
-            guard let url = item.fileURLs.first.flatMap(URL.init(string:)),
-                  arrived.contains(url.lastPathComponent) else { continue }
-            onNewFile?(item)
+        if folders.contains(path) { refresh(path) }
+        let folder = URL(fileURLWithPath: path, isDirectory: true)
+        for name in Self.newArrivals(added).sorted() {
+            onNewFile?(Self.item(for: folder.appendingPathComponent(name), date: Date()))
         }
+    }
+
+    /// Asks for folders whose new files should go on the Shelf.
+    func chooseWatchedFolders() {
+        NSApp.activate(ignoringOtherApps: true)
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Watch for the Shelf"
+        guard panel.runModal() == .OK else { return }
+        let added = panel.urls.map(\.path).filter { !Settings.shared.shelfWatchedFolders.contains($0) }
+        Settings.shared.shelfWatchedFolders.append(contentsOf: added)
     }
 
     private static func names(in path: String) -> Set<String> {
@@ -140,14 +152,17 @@ final class FolderLibrary {
             }
             .sorted { $0.1 > $1.1 }
             .prefix(limit)
-            .map { url, date in
-                ClipItem(id: CleanShotLibrary.stableID(for: url),
-                         type: .file,
-                         text: url.lastPathComponent,
-                         fileURLs: [url.absoluteString],
-                         sourceBundleID: "com.apple.finder",
-                         sourceAppName: "Finder",
-                         createdAt: date)
-            }
+            .map { url, date in item(for: url, date: date) }
+    }
+
+    /// A file as a clip, the same one every time it is read.
+    static func item(for url: URL, date: Date) -> ClipItem {
+        ClipItem(id: CleanShotLibrary.stableID(for: url),
+                 type: .file,
+                 text: url.lastPathComponent,
+                 fileURLs: [url.absoluteString],
+                 sourceBundleID: "com.apple.finder",
+                 sourceAppName: "Finder",
+                 createdAt: date)
     }
 }
