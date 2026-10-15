@@ -49,7 +49,7 @@ struct ClipCardView: View {
         .onTapGesture { store.select(item.id) }
         .highPriorityGesture(TapGesture().modifiers(.shift).onEnded { store.extendSelection(to: item.id) })
         .highPriorityGesture(TapGesture().modifiers(.command).onEnded { store.toggleSelection(item.id) })
-        .onDrag { ClipDragProvider.make(for: item) }
+        .onDrag { ClipDragProvider.make(for: item) } preview: { ClipDragPreview(item: item) }
         .contextMenu { menu }
         .task(id: item.id) { await loadPreview() }
     }

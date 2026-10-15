@@ -45,11 +45,12 @@ struct PinboardTabs: View {
 
     @ViewBuilder
     private func tabPill(_ tab: BarSource) -> some View {
-        let highlighted = store.source == tab || dropTarget == tab
+        let highlighted = store.source == tab
+        let dropping = dropTarget == tab
         switch tab {
         case .pinboard(let id):
             if let board = store.pinboards.first(where: { $0.id == id }) {
-                TabPill(title: board.name, dot: board.color, selected: highlighted) {
+                TabPill(title: board.name, dot: board.color, selected: highlighted, dropTarget: dropping) {
                     store.source = tab; store.selectFirst()
                 }
                 // Rename lived only in the context menu, which nobody found (#100).
@@ -60,14 +61,14 @@ struct PinboardTabs: View {
             if let group = store.groups.first(where: { $0.id == id }) {
                 // A folder stays lit while one of its pinboards is open.
                 TabPill(title: group.name, icon: "folder",
-                        selected: highlighted || store.group(for: store.source)?.id == id) {
+                        selected: highlighted || store.group(for: store.source)?.id == id, dropTarget: dropping) {
                     store.source = tab; store.selectFirst()
                 }
                 .simultaneousGesture(TapGesture(count: 2).onEnded { PinboardActions.rename(group) })
                 .help("Drop a pinboard tab here to move it into the folder")
             }
         case .cleanShot:
-            TabPill(title: "CleanShot", icon: "camera.viewfinder", selected: highlighted) {
+            TabPill(title: "CleanShot", icon: "camera.viewfinder", selected: highlighted, dropTarget: dropping) {
                 cleanShot.refresh()
                 store.source = tab; store.selectFirst()
             }
@@ -75,7 +76,7 @@ struct PinboardTabs: View {
         case .folder(let path):
             TabPill(title: FolderLibrary.title(for: path),
                     icon: path == Settings.downloadsPath ? "arrow.down.circle" : "folder.badge.gearshape",
-                    selected: highlighted) {
+                    selected: highlighted, dropTarget: dropping) {
                 FolderLibrary.shared.refresh(path)
                 store.source = tab; store.selectFirst()
             }
@@ -162,7 +163,7 @@ struct PinboardGroupRow: View {
                     .font(.system(size: 11, weight: .light))
                     .foregroundStyle(Theme.chromeTextTertiary)
                 TabPill(title: "All", icon: "square.stack", compact: true,
-                        selected: store.source == .group(group.id) || dropTarget == .group(group.id)) {
+                        selected: store.source == .group(group.id), dropTarget: dropTarget == .group(group.id)) {
                     store.source = .group(group.id); store.selectFirst()
                 }
                 .onDrop(of: [.item], isTargeted: TabDrag.targetBinding($dropTarget, .group(group.id))) { providers in
@@ -174,7 +175,7 @@ struct PinboardGroupRow: View {
                 ForEach(store.pinboards(in: group.id)) { board in
                     let tab = BarSource.pinboard(board.id)
                     TabPill(title: board.name, dot: board.color, compact: true,
-                            selected: store.source == tab || dropTarget == tab) {
+                            selected: store.source == tab, dropTarget: dropTarget == tab) {
                         store.source = tab; store.selectFirst()
                     }
                     .simultaneousGesture(TapGesture(count: 2).onEnded { PinboardActions.rename(board) })
@@ -223,6 +224,8 @@ struct TabPill: View {
     /// The smaller size of a folder's second row.
     var compact = false
     let selected: Bool
+    /// Something is being dragged over the tab and would land in it.
+    var dropTarget = false
     let action: () -> Void
 
     var body: some View {
@@ -238,10 +241,16 @@ struct TabPill: View {
                 .font(.system(size: compact ? 12.5 : 14, weight: selected ? .medium : .light))
                 .lineLimit(1)
         }
-        .foregroundStyle(selected ? Theme.chromeTextPrimary : Theme.chromeTextSecondary)
+        .foregroundStyle(selected || dropTarget ? Theme.chromeTextPrimary : Theme.chromeTextSecondary)
         .padding(.horizontal, compact ? 10 : 12)
         .frame(height: compact ? 26 : 30)
-        .background(selected ? Theme.pillSelected : Theme.pillBG, in: Capsule())
+        .background(dropTarget ? Theme.selection.opacity(0.22) : (selected ? Theme.pillSelected : Theme.pillBG),
+                    in: Capsule())
+        .overlay {
+            if dropTarget { Capsule().strokeBorder(Theme.selection, lineWidth: 1.5) }
+        }
+        .scaleEffect(dropTarget ? 1.08 : 1)
+        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: dropTarget)
         .contentShape(Capsule())
         .onTapGesture(perform: action)
         .accessibilityElement(children: .combine)

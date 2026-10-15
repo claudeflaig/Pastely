@@ -61,7 +61,7 @@ struct FavoriteTile: View {
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture { AppController.shared.pasteItem(item) }
-        .onDrag { ClipDragProvider.make(for: item) }
+        .onDrag { ClipDragProvider.make(for: item) } preview: { ClipDragPreview(item: item) }
         .help("Click to paste \(item.displayTitle)")
         .contextMenu { menu }
         .task(id: item.id) {
