@@ -190,11 +190,14 @@ struct ClipCardView: View {
         case .link:
             linkContent
         default:
+            // Copied text reads large; longer snippets shrink toward the old
+            // body size so they still fit the card.
             Text(item.text ?? "")
-                .font(.system(size: 13.5, weight: .light))
+                .font(.system(size: 22, weight: .regular))
                 .lineSpacing(2)
                 .foregroundStyle(Theme.cardTextPrimary)
                 .lineLimit(10)
+                .minimumScaleFactor(0.6)
                 .multilineTextAlignment(.leading)
         }
     }
