@@ -44,9 +44,8 @@ struct BarView: View {
                     onAccessibilityAdjustment: AppController.shared.adjustBarHeight)
             }
         }
-        // Only the corners facing into the screen are rounded.
-        .clipShape(RoundedCorners(radius: Theme.cornerRadius,
-                                  corners: topDocked ? [.bottomLeft, .bottomRight] : [.topLeft, .topRight]))
+        // The bar floats clear of the screen edges, so every corner is rounded.
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
         .ignoresSafeArea()
     }
 
@@ -276,42 +275,6 @@ struct BarView: View {
                 .foregroundStyle(Theme.chromeTextSecondary)
         }
     }
-}
-
-struct RoundedCorners: Shape {
-    var radius: CGFloat
-    var corners: RectCorner
-
-    func path(in rect: CGRect) -> Path {
-        var p = Path()
-        let tl = corners.contains(.topLeft) ? radius : 0
-        let tr = corners.contains(.topRight) ? radius : 0
-        let bl = corners.contains(.bottomLeft) ? radius : 0
-        let br = corners.contains(.bottomRight) ? radius : 0
-        p.move(to: CGPoint(x: rect.minX + tl, y: rect.minY))
-        p.addLine(to: CGPoint(x: rect.maxX - tr, y: rect.minY))
-        p.addArc(center: CGPoint(x: rect.maxX - tr, y: rect.minY + tr), radius: tr,
-                 startAngle: .degrees(-90), endAngle: .degrees(0), clockwise: false)
-        p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - br))
-        p.addArc(center: CGPoint(x: rect.maxX - br, y: rect.maxY - br), radius: br,
-                 startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
-        p.addLine(to: CGPoint(x: rect.minX + bl, y: rect.maxY))
-        p.addArc(center: CGPoint(x: rect.minX + bl, y: rect.maxY - bl), radius: bl,
-                 startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
-        p.addLine(to: CGPoint(x: rect.minX, y: rect.minY + tl))
-        p.addArc(center: CGPoint(x: rect.minX + tl, y: rect.minY + tl), radius: tl,
-                 startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
-        p.closeSubpath()
-        return p
-    }
-}
-
-struct RectCorner: OptionSet {
-    let rawValue: Int
-    static let topLeft = RectCorner(rawValue: 1 << 0)
-    static let topRight = RectCorner(rawValue: 1 << 1)
-    static let bottomLeft = RectCorner(rawValue: 1 << 2)
-    static let bottomRight = RectCorner(rawValue: 1 << 3)
 }
 
 /// A button in the bar's chrome, shaped like a tab: a soft capsule that

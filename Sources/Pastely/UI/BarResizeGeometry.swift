@@ -6,6 +6,8 @@ enum BarResizeGeometry {
     static let defaultHeight = 430.0
     static let minimumHeight = 300.0
     static let maximumHeight = 720.0
+    /// Gap between the floating bar and the screen edges around it.
+    static let screenMargin: CGFloat = 8
 
     /// Returns a value which is safe to persist independently of the display
     /// the bar happens to be shown on.
@@ -20,13 +22,13 @@ enum BarResizeGeometry {
         for requestedHeight: Double,
         in visibleFrame: CGRect
     ) -> CGFloat {
-        let displayHeight = visibleFrame.height
+        let displayHeight = visibleFrame.height - 2 * screenMargin
         guard displayHeight.isFinite, displayHeight > 0 else { return 0 }
         return min(CGFloat(normalizedPersistedHeight(requestedHeight)), displayHeight)
     }
 
-    /// Produces the complete panel frame, docked to the bottom or top edge of
-    /// a target display.
+    /// Produces the complete panel frame, floating `screenMargin` in from the
+    /// bottom or top edge and both sides of a target display.
     static func panelFrame(
         for requestedHeight: Double,
         in visibleFrame: CGRect,
@@ -38,26 +40,11 @@ enum BarResizeGeometry {
 
     static func dockedFrame(height: CGFloat, in visibleFrame: CGRect, topDocked: Bool) -> CGRect {
         CGRect(
-            x: visibleFrame.minX,
-            y: topDocked ? visibleFrame.maxY - height : visibleFrame.minY,
-            width: visibleFrame.width,
+            x: visibleFrame.minX + screenMargin,
+            y: topDocked ? visibleFrame.maxY - screenMargin - height
+                         : visibleFrame.minY + screenMargin,
+            width: max(0, visibleFrame.width - 2 * screenMargin),
             height: height
-        )
-    }
-
-    /// The macOS 26 glass surface extends past the docked edge so the corners
-    /// there remain clipped. Live resizing must preserve that oversized root view.
-    static func presentedContentFrame(
-        panelSize: CGSize,
-        bottomExtension: CGFloat,
-        topDocked: Bool = false
-    ) -> CGRect {
-        let extensionHeight = max(0, bottomExtension)
-        return CGRect(
-            x: 0,
-            y: topDocked ? 0 : -extensionHeight,
-            width: panelSize.width,
-            height: panelSize.height + extensionHeight
         )
     }
 }

@@ -39,10 +39,6 @@ final class BarWindowController: NSWindowController, NSWindowDelegate {
     /// Which edge the bar is docked to while shown. Fixed per presentation so a
     /// settings change mid-animation cannot split the show and hide directions.
     private var topDocked = false
-    /// The glass surface overhangs the docked edge; these pin the SwiftUI
-    /// content inside the visible part, one per possible edge.
-    private var bottomInsetConstraint: NSLayoutConstraint?
-    private var topInsetConstraint: NSLayoutConstraint?
 
     /// True while the bar is up or on its way up. `AppController.toggleBar` asks this
     /// instead of `window.isVisible`.
@@ -55,11 +51,6 @@ final class BarWindowController: NSWindowController, NSWindowDelegate {
 
     private static let showDuration: TimeInterval = 0.22
     private static let hideDuration: TimeInterval = 0.16
-
-    private static var contentBottomExtension: CGFloat {
-        if #available(macOS 26.0, *) { return Theme.cornerRadius }
-        return 0
-    }
 
     init() {
         let panel = BarPanel(
@@ -82,20 +73,8 @@ final class BarWindowController: NSWindowController, NSWindowDelegate {
         panel.sharingType = Settings.shared.hideWhileScreenSharing ? .none : .readOnly
         let content = NSHostingView(rootView: BarView(searchBridge: searchBridge))
         if #available(macOS 26.0, *) {
-            let glassContent = NSView()
-            content.translatesAutoresizingMaskIntoConstraints = false
-            glassContent.addSubview(content)
-            NSLayoutConstraint.activate([
-                content.leadingAnchor.constraint(equalTo: glassContent.leadingAnchor),
-                content.trailingAnchor.constraint(equalTo: glassContent.trailingAnchor),
-            ])
-            let top = content.topAnchor.constraint(equalTo: glassContent.topAnchor)
-            let bottom = content.bottomAnchor.constraint(equalTo: glassContent.bottomAnchor,
-                                                         constant: -Theme.cornerRadius)
-            NSLayoutConstraint.activate([top, bottom])
-
             let glass = NSGlassEffectView()
-            glass.contentView = glassContent
+            glass.contentView = content
             glass.cornerRadius = Theme.cornerRadius
             glass.tintColor = Theme.glassTint
             glass.style = .regular
@@ -105,12 +84,6 @@ final class BarWindowController: NSWindowController, NSWindowDelegate {
             panel.contentView = content
         }
         super.init(window: panel)
-        if #available(macOS 26.0, *),
-           let glassContent = (panel.contentView as? NSGlassEffectView)?.contentView {
-            let constraints = glassContent.constraints
-            topInsetConstraint = constraints.first { $0.firstAttribute == .top }
-            bottomInsetConstraint = constraints.first { $0.firstAttribute == .bottom }
-        }
         panel.delegate = self
     }
 
@@ -166,9 +139,6 @@ final class BarWindowController: NSWindowController, NSWindowDelegate {
         panel.appearance = Settings.shared.barAppearance.nsAppearance
         let vf = screen.visibleFrame
         topDocked = Settings.shared.barEdge == .top
-        // The overhang moves to whichever edge touches the screen border.
-        topInsetConstraint?.constant = topDocked ? Self.contentBottomExtension : 0
-        bottomInsetConstraint?.constant = topDocked ? 0 : -Self.contentBottomExtension
         let onScreen = BarResizeGeometry.panelFrame(
             for: Settings.shared.barHeight,
             in: vf,
@@ -186,11 +156,9 @@ final class BarWindowController: NSWindowController, NSWindowDelegate {
         // flew across the bezel. A view clipped to the window can never escape it.
         panel.setFrame(onScreen, display: false)
         guard let content = panel.contentView else { return }
-        let bottomExtension = Self.contentBottomExtension
-        let contentHeight = height + bottomExtension
         content.autoresizingMask = []
-        content.frame = NSRect(x: 0, y: topDocked ? height : -contentHeight,
-                               width: onScreen.width, height: contentHeight)
+        content.frame = NSRect(x: 0, y: topDocked ? height : -height,
+                               width: onScreen.width, height: height)
 
         let token = beginTransition()
         phase = .showing(token)
@@ -214,11 +182,7 @@ final class BarWindowController: NSWindowController, NSWindowDelegate {
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = Self.showDuration
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            content.animator().frame = BarResizeGeometry.presentedContentFrame(
-                panelSize: onScreen.size,
-                bottomExtension: bottomExtension,
-                topDocked: self.topDocked
-            )
+            content.animator().frame = NSRect(origin: .zero, size: onScreen.size)
         }, completionHandler: { DispatchQueue.main.async(execute: finish) })
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.showDuration + 0.05, execute: finish)
     }
@@ -322,11 +286,7 @@ final class BarWindowController: NSWindowController, NSWindowDelegate {
         guard let panel = window, let content = panel.contentView,
               frame.width > 0, frame.height > 0 else { return }
         panel.setFrame(frame, display: true)
-        content.frame = BarResizeGeometry.presentedContentFrame(
-            panelSize: frame.size,
-            bottomExtension: Self.contentBottomExtension,
-            topDocked: topDocked
-        )
+        content.frame = NSRect(origin: .zero, size: frame.size)
     }
 
     func windowDidResignKey(_ notification: Notification) {
