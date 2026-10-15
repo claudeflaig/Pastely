@@ -38,6 +38,9 @@ extension ClipboardStore {
                      createdAt: now.addingTimeInterval(-9000))
         ]
         for item in demo.reversed() { addCaptured(item) }
+        if favorites.isEmpty {
+            for item in [demo[4], demo[3], demo[1], demo[0]] { addFavorite(item) }
+        }
         selectFirst()
     }
 }

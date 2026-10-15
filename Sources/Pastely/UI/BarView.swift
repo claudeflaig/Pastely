@@ -221,6 +221,11 @@ struct BarView: View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: Theme.cardSpacing) {
+                    // Favorites lead Clipboard, but not a search or filter.
+                    if store.source == .history, !store.favorites.isEmpty,
+                       store.searchText.isEmpty, !store.filter.isActive {
+                        FavoriteBlocks()
+                    }
                     ForEach(Array(store.visibleItems.enumerated()), id: \.element.id) { index, item in
                         ClipCardView(item: item,
                                      index: index,

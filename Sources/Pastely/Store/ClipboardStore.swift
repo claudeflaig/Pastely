@@ -33,6 +33,8 @@ final class ClipboardStore {
     private(set) var history: [ClipItem] = []
     private(set) var pinboards: [Pinboard] = []
     private(set) var groups: [PinboardGroup] = []
+    /// Clips pinned as small tiles at the start of Clipboard, each its own copy.
+    private(set) var favorites: [ClipItem] = []
 
     private var undoStack = ClipUndoStack()
     /// True while a deletion can still be undone; drives the bar's Undo button.
@@ -560,6 +562,32 @@ final class ClipboardStore {
         scheduleSave()
     }
 
+    // MARK: - Favorites
+
+    func isFavorite(_ item: ClipItem) -> Bool {
+        favorites.contains { $0.id == item.id || $0.sameContent(as: item) }
+    }
+
+    func addFavorite(_ item: ClipItem) {
+        guard !isFavorite(item) else { return }
+        favorites.append(independentCopy(of: item, createdAt: item.createdAt))
+        scheduleSave()
+    }
+
+    func removeFavorite(_ item: ClipItem) {
+        let removed = favorites.filter { $0.id == item.id || $0.sameContent(as: item) }
+        favorites.removeAll { $0.id == item.id || $0.sameContent(as: item) }
+        for gone in removed { deleteImageFile(gone) }
+        scheduleSave()
+    }
+
+    func moveFavorite(_ item: ClipItem, by offset: Int) {
+        guard let from = favorites.firstIndex(where: { $0.id == item.id }),
+              favorites.indices.contains(from + offset) else { return }
+        favorites.swapAt(from, from + offset)
+        scheduleSave()
+    }
+
     func saveToPinboard(_ item: ClipItem, boardID: UUID) {
         guard let i = pinboards.firstIndex(where: { $0.id == boardID }) else { return }
         if pinboards[i].items.contains(where: { $0.sameContent(as: item) }) { return }
@@ -590,6 +618,7 @@ final class ClipboardStore {
 
     func item(withID id: UUID) -> ClipItem? {
         if let item = history.first(where: { $0.id == id }) { return item }
+        if let item = favorites.first(where: { $0.id == id }) { return item }
         return pinboards.lazy.flatMap(\.items).first(where: { $0.id == id })
     }
 
@@ -836,6 +865,7 @@ final class ClipboardStore {
         guard let name = item.imageFileName else { return }
         let stillUsed = history.contains { $0.imageFileName == name }
             || pinboards.contains { $0.items.contains { $0.imageFileName == name } }
+            || favorites.contains { $0.imageFileName == name }
             || undoStack.retainsImageFile(named: name)
         if stillUsed { return }
         if let url = imageURL(for: item) { try? FileManager.default.removeItem(at: url) }
@@ -846,6 +876,8 @@ final class ClipboardStore {
         var pinboards: [Pinboard]
         /// Missing in stores written before pinboard folders.
         var groups: [PinboardGroup]?
+        /// Missing in stores written before favorites.
+        var favorites: [ClipItem]?
     }
 
     private func load() {
@@ -859,6 +891,7 @@ final class ClipboardStore {
             return board
         }
         groups = snap.groups ?? []
+        favorites = (snap.favorites ?? []).map { $0.recognizingHexColor() }
         selectFirst()
     }
 
@@ -870,7 +903,7 @@ final class ClipboardStore {
     }
 
     func saveNow() {
-        let snap = Snapshot(history: history, pinboards: pinboards, groups: groups)
+        let snap = Snapshot(history: history, pinboards: pinboards, groups: groups, favorites: favorites)
         guard let data = try? JSONEncoder().encode(snap) else { return }
         ignoreWatchUntil = Date().addingTimeInterval(1.5)
         try? data.write(to: storeURL, options: .atomic)
@@ -1064,6 +1097,9 @@ final class ClipboardStore {
             + byID.values.filter { b in !pinboards.contains(where: { $0.id == b.id }) }
         for g in snap.groups ?? [] where !groups.contains(where: { $0.id == g.id }) {
             groups.append(g)
+        }
+        for f in snap.favorites ?? [] where !favorites.contains(where: { $0.id == f.id || $0.sameContent(as: f) }) {
+            favorites.append(f)
         }
 
         combined.removeAll()

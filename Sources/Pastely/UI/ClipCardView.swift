@@ -481,6 +481,16 @@ struct ClipCardView: View {
 
         Divider()
 
+        if store.isFavorite(item) {
+            Button { store.removeFavorite(item) } label: {
+                Label("Remove from Favorites", systemImage: "star.slash")
+            }
+        } else {
+            Button { store.addFavorite(item) } label: {
+                Label("Add to Favorites", systemImage: "star")
+            }
+        }
+
         Menu {
             if store.pinboards.isEmpty {
                 Button("No Pinboards Yet") {}
@@ -579,7 +589,7 @@ struct ClipCardView: View {
 /// The standard transparency checkerboard drawn behind image clips. A Canvas
 /// rather than a tiled image: the pattern is a handful of rects, and this keeps
 /// it resolution independent without shipping an asset.
-private struct CheckerboardBackground: View {
+struct CheckerboardBackground: View {
     var square: CGFloat = 8
 
     var body: some View {
