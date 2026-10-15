@@ -4,6 +4,7 @@ import CryptoKit
 @MainActor
 final class ClipboardMonitor {
     private static let sourceType = NSPasteboard.PasteboardType("org.nspasteboard.source")
+    private static let remoteClipboardType = NSPasteboard.PasteboardType("com.apple.is-remote-clipboard")
     private static let htmlCaptureLimit = 64 * 1024
     private let pasteboard = NSPasteboard.general
     private var lastChangeCount: Int
@@ -35,11 +36,16 @@ final class ClipboardMonitor {
         lastChangeCount = current
         guard !isPaused else { return }
         if current == suppressUntilChangeCount { return }
+        // Universal Clipboard marks what arrives from another device.
+        let fromOtherDevice = pasteboard.types?.contains(Self.remoteClipboardType) ?? false
         guard let item = makeItem() else { return }
         ClipboardStore.shared.addCaptured(item)
         PasteStack.shared.capture(item)
         if Settings.shared.playSoundOnCapture { Self.playCaptureSound() }
-        if Settings.shared.shelfCollects(item.type) { Shelf.shared.add(item) }
+        let settings = Settings.shared
+        if (fromOtherDevice && settings.shelfForOtherDevices) || settings.shelfCollects(item.type) {
+            Shelf.shared.add(item)
+        }
     }
 
     /// Quiet, so it confirms a copy without getting in the way.

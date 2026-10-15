@@ -559,7 +559,10 @@ private struct ShelfSettings: View {
         VStack(alignment: .leading, spacing: 20) {
             SettingsCard(title: "What goes on the Shelf",
                          footer: "The Shelf appears with the first item and stays until you close it or drag everything out.") {
-                SettingsToggle(title: "New copies", isOn: $settings.shelfForClips)
+                SettingsToggle(title: "Copies from your other devices",
+                               detail: "What you copy on your iPhone, iPad or another Mac and arrives here through Continuity, whatever its kind.",
+                               isOn: $settings.shelfForOtherDevices)
+                SettingsToggle(title: "Copies on this Mac", isOn: $settings.shelfForClips)
                 ForEach(Self.kinds, id: \.type) { kind in
                     SettingsToggle(title: kind.title, isOn: kindBinding(kind.type))
                         .padding(.leading, 18)

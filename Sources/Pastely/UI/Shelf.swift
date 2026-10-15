@@ -15,8 +15,9 @@ final class Shelf {
     let model = ShelfModel()
     private var panel: NSPanel?
 
-    private static let collapsedSize = NSSize(width: 214, height: 226)
-    private static let expandedSize = NSSize(width: 448, height: 340)
+    // As tall as the Paste Stack; open, the items line up in a row like its cards.
+    private static let collapsedSize = NSSize(width: 236, height: 214)
+    private static let expandedSize = NSSize(width: 560, height: 214)
     private static let positionKey = "shelfTopLeft"
 
     private init() {
@@ -42,6 +43,7 @@ final class Shelf {
             return
         }
         let panel = self.panel ?? makePanel()
+        panel.appearance = Settings.shared.barAppearance.nsAppearance
         let size = model.expanded ? Self.expandedSize : Self.collapsedSize
         let topLeft = clampedTopLeft(for: size)
         panel.setFrame(NSRect(x: topLeft.x, y: topLeft.y - size.height, width: size.width, height: size.height),
@@ -77,7 +79,6 @@ final class Shelf {
         panel.level = .floating
         panel.hidesOnDeactivate = false
         panel.isMovable = true
-        panel.appearance = NSAppearance(named: .darkAqua)
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.sharingType = Settings.shared.hideWhileScreenSharing ? .none : .readOnly
         panel.contentView = NSHostingView(rootView: ShelfView(model: model))
@@ -162,51 +163,75 @@ struct ShelfView: View {
     var body: some View {
         ZStack {
             WindowDragArea()
-            Group {
+            VStack(alignment: .leading, spacing: 10) {
+                header
                 if model.expanded { expanded } else { collapsed }
             }
-            .padding(12)
+            .padding(14)
         }
-        .background(VisualEffectView(material: .hudWindow, blending: .behindWindow))
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous)
-            .strokeBorder(.white.opacity(0.12), lineWidth: 1))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        // The Paste Stack's surface, corner and hairline, so both read as one.
+        .background {
+            ZStack {
+                VisualEffectView(material: .popover)
+                Theme.panelTint
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+            .strokeBorder(Theme.cardBorder))
+    }
+
+    private var header: some View {
+        HStack(spacing: 10) {
+            if model.expanded {
+                HeaderButton(symbol: "chevron.left", help: "Back to the stack") { model.expanded = false }
+            } else {
+                Image(systemName: "tray.full.fill")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Theme.selection)
+            }
+            Text("Shelf")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Theme.chromeTextPrimary)
+            Text(model.items.count == 1 ? "1 item" : "\(model.items.count) items")
+                .font(.system(size: 12, weight: .light))
+                .foregroundStyle(Theme.chromeTextSecondary)
+            if model.expanded, let size = ShelfModel.sizeText(of: model.items) {
+                Text("· \(size)")
+                    .font(.system(size: 12, weight: .light))
+                    .foregroundStyle(Theme.chromeTextSecondary)
+            }
+            Spacer(minLength: 8)
+            if model.expanded {
+                HeaderButton(symbol: model.listMode ? "square.grid.2x2" : "list.bullet",
+                             help: model.listMode ? "Show as tiles" : "Show as list") { model.listMode.toggle() }
+            }
+            Menu {
+                actions(for: model.items)
+                Divider()
+                Button("Close Shelf") { model.clear() }
+            } label: {
+                HeaderButtonLabel(symbol: "ellipsis", filled: false)
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("More")
+            HeaderButton(symbol: "xmark", filled: true, help: "Close the Shelf") { model.clear() }
+        }
     }
 
     // MARK: Stack
 
     private var collapsed: some View {
-        VStack(spacing: 0) {
-            ZStack {
-                Capsule().fill(.white.opacity(0.25)).frame(width: 34, height: 4)
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    .padding(.top, -4)
-                    .allowsHitTesting(false)
-                HStack {
-                    CircleButton(symbol: "xmark", help: "Close the Shelf") { model.clear() }
-                    Spacer()
-                    Menu {
-                        actions(for: model.items)
-                        Divider()
-                        Button("Close Shelf") { model.clear() }
-                    } label: {
-                        CircleButtonLabel(symbol: "chevron.down")
-                    }
-                    // The button style keeps the label as drawn; a borderless
-                    // menu would drop its circle.
-                    .menuStyle(.button)
-                    .buttonStyle(.plain)
-                    .menuIndicator(.hidden)
-                    .fixedSize()
-                }
-            }
-            .frame(height: 38)
-
+        VStack(spacing: 10) {
             ZStack {
                 let shown = Array(model.items.suffix(3))
                 ForEach(Array(shown.enumerated()), id: \.element.id) { index, item in
                     let fromTop = shown.count - 1 - index
-                    ShelfThumbnail(item: item, side: 96)
+                    ShelfThumbnail(item: item, side: 84)
                         .rotationEffect(.degrees(fromTop == 0 ? 0 : (fromTop == 1 ? -7 : 6)))
                         .offset(x: fromTop == 0 ? 0 : (fromTop == 1 ? -6 : 7), y: CGFloat(fromTop) * -3)
                 }
@@ -223,114 +248,87 @@ struct ShelfView: View {
             Button { model.expanded = true } label: {
                 HStack(spacing: 6) {
                     Text(ShelfModel.title(for: model.items))
-                        .font(.system(size: 14, weight: .regular))
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .regular))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(Theme.chromeTextSecondary)
                 }
-                .foregroundStyle(.primary)
-                .padding(.horizontal, 16)
-                .frame(height: 34)
-                .background(.white.opacity(0.12), in: Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ChromePillButtonStyle())
         }
     }
 
     // MARK: Open
 
+    @ViewBuilder
     private var expanded: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                CircleButton(symbol: "chevron.left", help: "Back") { model.expanded = false }
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(ShelfModel.title(for: model.items))
-                        .font(.system(size: 16, weight: .medium))
-                    if let size = ShelfModel.sizeText(of: model.items) {
-                        Text(size).font(.system(size: 12, weight: .light)).foregroundStyle(.secondary)
-                    }
-                }
-                Spacer()
-                HStack(spacing: 0) {
-                    modeButton("square.grid.2x2", list: false)
-                    modeButton("list.bullet", list: true)
-                }
-                .padding(3)
-                .background(.white.opacity(0.1), in: Capsule())
-            }
-
+        if model.listMode {
             ScrollView {
-                if model.listMode {
-                    LazyVStack(spacing: 4) {
-                        ForEach(model.items.reversed()) { item in row(item) }
-                    }
-                } else {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 116), spacing: 10)], spacing: 14) {
-                        ForEach(model.items.reversed()) { item in tile(item) }
-                        if !ShelfModel.fileURLs(of: model.items).isEmpty { revealTile }
-                    }
-                    .padding(.top, 4)
+                LazyVStack(spacing: 4) {
+                    ForEach(model.items.reversed()) { item in row(item) }
                 }
             }
+        } else {
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 12) {
+                    ForEach(model.items.reversed()) { item in tile(item) }
+                    if !ShelfModel.fileURLs(of: model.items).isEmpty { revealTile }
+                }
+                .padding(.horizontal, 2)
+            }
         }
-    }
-
-    private func modeButton(_ symbol: String, list: Bool) -> some View {
-        Button { model.listMode = list } label: {
-            Image(systemName: symbol)
-                .font(.system(size: 13, weight: .regular))
-                .frame(width: 34, height: 28)
-                .background(model.listMode == list ? .white.opacity(0.18) : .clear, in: Capsule())
-        }
-        .buttonStyle(.plain)
     }
 
     private func tile(_ item: ClipItem) -> some View {
-        VStack(spacing: 6) {
-            ShelfThumbnail(item: item, side: 72)
-                .frame(height: 80)
+        VStack(spacing: 5) {
+            ShelfThumbnail(item: item, side: 84)
+                .frame(height: 92)
             Text(ShelfItemText.name(of: item))
-                .font(.system(size: 12.5, weight: .regular))
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(Theme.chromeTextPrimary)
                 .lineLimit(1).truncationMode(.middle)
             Text(ShelfItemText.detail(of: item))
                 .font(.system(size: 11, weight: .light))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.chromeTextSecondary)
                 .lineLimit(1)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 6)
+        .frame(width: 112)
+        .padding(.vertical, 4)
         .contentShape(Rectangle())
         .overlay { dragSource(for: item) }
     }
 
     private func row(_ item: ClipItem) -> some View {
         HStack(spacing: 10) {
-            ShelfThumbnail(item: item, side: 30)
+            ShelfThumbnail(item: item, side: 28)
             Text(ShelfItemText.name(of: item))
                 .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(Theme.chromeTextPrimary)
                 .lineLimit(1).truncationMode(.middle)
             Spacer()
             Text(ShelfItemText.detail(of: item))
                 .font(.system(size: 11.5, weight: .light))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.chromeTextSecondary)
         }
-        .padding(.horizontal, 8)
-        .frame(height: 40)
-        .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
+        .padding(.horizontal, 10)
+        .frame(height: 38)
+        .background(Theme.pillSelected, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay { dragSource(for: item) }
     }
 
     private var revealTile: some View {
         Button { NSWorkspace.shared.activateFileViewerSelecting(ShelfModel.fileURLs(of: model.items)) } label: {
-            VStack(spacing: 8) {
+            VStack(spacing: 5) {
                 Image(systemName: "arrowshape.turn.up.right.circle")
-                    .font(.system(size: 44, weight: .ultraLight))
-                    .foregroundStyle(.secondary)
-                    .frame(height: 80)
-                Text("Reveal in Finder").font(.system(size: 12.5, weight: .regular))
+                    .font(.system(size: 40, weight: .ultraLight))
+                    .foregroundStyle(Theme.chromeTextSecondary)
+                    .frame(height: 92)
+                Text("Reveal in Finder")
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(Theme.chromeTextPrimary)
+                Text(" ").font(.system(size: 11))
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 6)
+            .frame(width: 112)
+            .padding(.vertical, 4)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -365,27 +363,30 @@ struct ShelfView: View {
     }
 }
 
-private struct CircleButton: View {
+/// The Paste Stack's round header buttons.
+private struct HeaderButton: View {
     let symbol: String
+    var filled = false
     let help: String
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) { CircleButtonLabel(symbol: symbol) }
+        Button(action: action) { HeaderButtonLabel(symbol: symbol, filled: filled) }
             .buttonStyle(.plain)
             .help(help)
     }
 }
 
-private struct CircleButtonLabel: View {
+private struct HeaderButtonLabel: View {
     let symbol: String
+    var filled: Bool
 
     var body: some View {
         Image(systemName: symbol)
-            .font(.system(size: 14, weight: .medium))
-            .foregroundStyle(.primary)
-            .frame(width: 36, height: 36)
-            .background(.white.opacity(0.12), in: Circle())
+            .font(.system(size: filled ? 11 : 12, weight: filled ? .semibold : .medium))
+            .foregroundStyle(Theme.chromeTextSecondary)
+            .frame(width: 26, height: 26)
+            .background(filled ? Theme.fieldBG : Color.clear, in: Circle())
             .contentShape(Circle())
     }
 }

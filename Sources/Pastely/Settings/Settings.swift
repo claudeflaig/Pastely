@@ -288,6 +288,7 @@ final class Settings {
         static let shelfForClips = "shelfForClips"
         static let shelfForFolders = "shelfForFolders"
         static let shelfKinds = "shelfKinds"
+        static let shelfForOtherDevices = "shelfForOtherDevices"
         static let shelfWatchedFolders = "shelfWatchedFolders"
         static let shelfRemoveAfterDrag = "shelfRemoveAfterDrag"
         static let shelfTextAsFile = "shelfTextAsFile"
@@ -431,6 +432,12 @@ final class Settings {
     /// Which kinds of copies go on the Shelf, as `ClipType` raw values.
     var shelfKinds: Set<String> {
         didSet { guard isLoaded else { return }; d.set(Array(shelfKinds), forKey: Keys.shelfKinds) }
+    }
+
+    /// Copies from an iPhone, iPad or other Mac through Continuity's
+    /// Universal Clipboard go on the Shelf whatever their kind.
+    var shelfForOtherDevices: Bool {
+        didSet { guard isLoaded else { return }; d.set(shelfForOtherDevices, forKey: Keys.shelfForOtherDevices) }
     }
 
     /// Whatever lands somewhere when dragged out leaves the Shelf.
@@ -648,7 +655,9 @@ final class Settings {
             Keys.shelfForClips: true,
             Keys.shelfForFolders: true,
             Keys.shelfWatchedFolders: [Settings.downloadsPath],
-            Keys.shelfKinds: [ClipType.text, .link, .image, .file, .color].map(\.rawValue),
+            // Text copies are too frequent to stack up by default.
+            Keys.shelfKinds: [ClipType.link, .image, .file, .color].map(\.rawValue),
+            Keys.shelfForOtherDevices: true,
             Keys.shelfRemoveAfterDrag: true,
             Keys.shelfTextAsFile: true,
             Keys.promoteOnPaste: false,
@@ -697,6 +706,7 @@ final class Settings {
         shelfForClips = d.bool(forKey: Keys.shelfForClips)
         shelfForFolders = d.bool(forKey: Keys.shelfForFolders)
         shelfKinds = Set(d.stringArray(forKey: Keys.shelfKinds) ?? [])
+        shelfForOtherDevices = d.bool(forKey: Keys.shelfForOtherDevices)
         shelfWatchedFolders = d.stringArray(forKey: Keys.shelfWatchedFolders) ?? []
         shelfRemoveAfterDrag = d.bool(forKey: Keys.shelfRemoveAfterDrag)
         shelfTextAsFile = d.bool(forKey: Keys.shelfTextAsFile)
