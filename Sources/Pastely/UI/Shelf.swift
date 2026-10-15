@@ -182,44 +182,29 @@ struct ShelfView: View {
             .strokeBorder(Theme.cardBorder))
     }
 
+    /// Only two quiet round buttons, as in Dropover, so the Shelf does not
+    /// pull the eye away from the windows around it.
     private var header: some View {
-        HStack(spacing: 10) {
-            if model.expanded {
-                HeaderButton(symbol: "chevron.left", help: "Back to the stack") { model.expanded = false }
-            } else {
-                Image(systemName: "tray.full.fill")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Theme.selection)
-            }
-            Text("Shelf")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(Theme.chromeTextPrimary)
-            Text(model.items.count == 1 ? "1 item" : "\(model.items.count) items")
-                .font(.system(size: 12, weight: .light))
-                .foregroundStyle(Theme.chromeTextSecondary)
-            if model.expanded, let size = ShelfModel.sizeText(of: model.items) {
-                Text("· \(size)")
-                    .font(.system(size: 12, weight: .light))
-                    .foregroundStyle(Theme.chromeTextSecondary)
-            }
+        HStack(spacing: 8) {
+            HeaderButton(symbol: "xmark", filled: true, help: "Close the Shelf") { model.clear() }
             Spacer(minLength: 8)
             if model.expanded {
-                HeaderButton(symbol: model.listMode ? "square.grid.2x2" : "list.bullet",
+                HeaderButton(symbol: model.listMode ? "square.grid.2x2" : "list.bullet", filled: true,
                              help: model.listMode ? "Show as tiles" : "Show as list") { model.listMode.toggle() }
+                HeaderButton(symbol: "chevron.left", filled: true, help: "Back to the stack") { model.expanded = false }
             }
             Menu {
                 actions(for: model.items)
                 Divider()
                 Button("Close Shelf") { model.clear() }
             } label: {
-                HeaderButtonLabel(symbol: "ellipsis", filled: false)
+                HeaderButtonLabel(symbol: "ellipsis", filled: true)
             }
             .menuStyle(.button)
             .buttonStyle(.plain)
             .menuIndicator(.hidden)
             .fixedSize()
             .help("More")
-            HeaderButton(symbol: "xmark", filled: true, help: "Close the Shelf") { model.clear() }
         }
     }
 
@@ -368,7 +353,7 @@ struct ShelfView: View {
     }
 }
 
-/// The Paste Stack's round header buttons.
+/// The Shelf's round header buttons, sized like Dropover's.
 private struct HeaderButton: View {
     let symbol: String
     var filled = false
@@ -388,9 +373,9 @@ private struct HeaderButtonLabel: View {
 
     var body: some View {
         Image(systemName: symbol)
-            .font(.system(size: filled ? 11 : 12, weight: filled ? .semibold : .medium))
-            .foregroundStyle(Theme.chromeTextSecondary)
-            .frame(width: 26, height: 26)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(Theme.chromeTextPrimary.opacity(0.85))
+            .frame(width: 30, height: 30)
             .background(filled ? Theme.fieldBG : Color.clear, in: Circle())
             .contentShape(Circle())
     }
