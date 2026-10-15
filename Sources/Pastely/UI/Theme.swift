@@ -43,6 +43,7 @@ enum Theme {
     static let fieldBG = ink(0.07)
     static let pillBG = Color.clear
     static let pillSelected = ink(0.08)
+    static let pillHover = ink(0.14)
 
     /// Black washes on light surfaces, white on dark ones, for fills.
     private static func ink(_ opacity: CGFloat) -> Color {

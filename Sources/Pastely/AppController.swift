@@ -107,6 +107,10 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     return
                 }
                 self.showBar()
+                // --demo-undo deletes a clip, so the Undo button shows.
+                if CommandLine.arguments.contains("--demo-undo"), let last = self.store.history.last {
+                    self.store.delete(items: [last])
+                }
                 if CommandLine.arguments.contains("--demo-filter") {
                     self.store.filter = ClipFilter(kinds: [.text, .link], dateRange: .today)
                 }

@@ -84,6 +84,7 @@ struct BarView: View {
         }
         .padding(.horizontal, 18)
         .frame(height: 56)
+        .animation(.easeOut(duration: 0.18), value: store.hasUndoableDeletion)
     }
 
     private var syncButton: some View {
@@ -160,12 +161,8 @@ struct BarView: View {
             AppController.shared.deleteEffectiveSelection()
         } label: {
             Label("Delete \(count)", systemImage: "trash")
-                .font(.system(size: 12.5, weight: .regular))
-                .lineLimit(1)
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-        .fixedSize()
+        .buttonStyle(ChromePillButtonStyle(tint: .red))
         .help("Delete \(count) selected clips (⌘⌫)")
         .accessibilityLabel("Delete \(count) selected clips")
     }
@@ -175,14 +172,11 @@ struct BarView: View {
             store.undoLastDelete()
         } label: {
             Label("Undo", systemImage: "arrow.uturn.backward")
-                .font(.system(size: 12.5, weight: .regular))
-                .lineLimit(1)
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-        .fixedSize()
+        .buttonStyle(ChromePillButtonStyle())
         .help("Undo the last deletion (⌘Z), available for 5 minutes")
         .accessibilityLabel("Undo last deletion")
+        .transition(.opacity.combined(with: .scale(scale: 0.9)))
     }
 
     private var moreMenu: some View {
@@ -318,4 +312,50 @@ struct RectCorner: OptionSet {
     static let topRight = RectCorner(rawValue: 1 << 1)
     static let bottomLeft = RectCorner(rawValue: 1 << 2)
     static let bottomRight = RectCorner(rawValue: 1 << 3)
+}
+
+/// A button in the bar's chrome, shaped like a tab: a soft capsule that
+/// lightens on hover and dips when pressed.
+struct ChromePillButtonStyle: ButtonStyle {
+    var tint: Color? = nil
+
+    func makeBody(configuration: Configuration) -> some View {
+        ChromePill(configuration: configuration, tint: tint)
+    }
+
+    private struct ChromePill: View {
+        let configuration: Configuration
+        let tint: Color?
+        @State private var hovering = false
+
+        var body: some View {
+            configuration.label
+                .labelStyle(PillLabelStyle())
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(tint ?? Theme.chromeTextPrimary)
+                .padding(.horizontal, 12)
+                .frame(height: 28)
+                .background(Capsule().fill(background))
+                .contentShape(Capsule())
+                .scaleEffect(configuration.isPressed ? 0.96 : 1)
+                .onHover { hovering = $0 }
+                .animation(.easeOut(duration: 0.12), value: hovering)
+                .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
+                .fixedSize()
+        }
+
+        private var background: Color {
+            let base = tint.map { $0.opacity(0.14) } ?? Theme.pillSelected
+            return hovering || configuration.isPressed ? (tint.map { $0.opacity(0.22) } ?? Theme.pillHover) : base
+        }
+    }
+
+    private struct PillLabelStyle: LabelStyle {
+        func makeBody(configuration: Configuration) -> some View {
+            HStack(spacing: 6) {
+                configuration.icon.font(.system(size: 11.5, weight: .regular))
+                configuration.title
+            }
+        }
+    }
 }
