@@ -39,7 +39,7 @@ final class ClipboardMonitor {
         ClipboardStore.shared.addCaptured(item)
         PasteStack.shared.capture(item)
         if Settings.shared.playSoundOnCapture { Self.playCaptureSound() }
-        if Settings.shared.shelfForClips { Shelf.shared.add(item) }
+        if Settings.shared.shelfCollects(item.type) { Shelf.shared.add(item) }
     }
 
     /// Quiet, so it confirms a copy without getting in the way.

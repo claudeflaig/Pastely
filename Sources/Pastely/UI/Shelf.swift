@@ -27,6 +27,14 @@ final class Shelf {
         model.add(item)
     }
 
+    func clear() { model.clear() }
+
+    /// Back to the lower right corner the next time it opens.
+    func resetPosition() {
+        UserDefaults.standard.removeObject(forKey: Self.positionKey)
+        if !model.items.isEmpty { layout() }
+    }
+
     private func layout() {
         guard !model.items.isEmpty else {
             panel?.orderOut(nil)
@@ -514,6 +522,7 @@ enum ShelfActions {
     /// Finder as a file named after their first line, and in a text field
     /// as their text; everything else as in `writers(for:)`.
     static func dragWriters(for item: ClipItem) -> [NSPasteboardWriting] {
+        guard Settings.shared.shelfTextAsFile else { return writers(for: item) }
         switch item.type {
         case .text, .color:
             let text = item.plainText ?? ""
@@ -677,7 +686,9 @@ final class ShelfDragSourceView: NSView, NSDraggingSource {
         draggedItems = []
         dragging = false
         guard operation != [] else { return }
-        MainActor.assumeIsolated { onDragged(dragged) }
+        MainActor.assumeIsolated {
+            if Settings.shared.shelfRemoveAfterDrag { onDragged(dragged) }
+        }
     }
 }
 

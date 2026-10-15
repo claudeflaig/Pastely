@@ -287,6 +287,9 @@ final class Settings {
         static let captureSoundName = "captureSoundName"
         static let shelfForClips = "shelfForClips"
         static let shelfForFolders = "shelfForFolders"
+        static let shelfKinds = "shelfKinds"
+        static let shelfRemoveAfterDrag = "shelfRemoveAfterDrag"
+        static let shelfTextAsFile = "shelfTextAsFile"
         static let promoteOnPaste = "promoteOnPaste"
         static let ignoreConcealed = "ignoreConcealed"
         static let deletePermanently = "deletePermanently"
@@ -408,6 +411,26 @@ final class Settings {
     /// Puts each file that lands in a folder tab, such as a download, on the Shelf.
     var shelfForFolders: Bool {
         didSet { guard isLoaded else { return }; d.set(shelfForFolders, forKey: Keys.shelfForFolders) }
+    }
+
+    /// Which kinds of copies go on the Shelf, as `ClipType` raw values.
+    var shelfKinds: Set<String> {
+        didSet { guard isLoaded else { return }; d.set(Array(shelfKinds), forKey: Keys.shelfKinds) }
+    }
+
+    /// Whatever lands somewhere when dragged out leaves the Shelf.
+    var shelfRemoveAfterDrag: Bool {
+        didSet { guard isLoaded else { return }; d.set(shelfRemoveAfterDrag, forKey: Keys.shelfRemoveAfterDrag) }
+    }
+
+    /// Text dragged into Finder becomes a .txt file instead of a text clipping.
+    var shelfTextAsFile: Bool {
+        didSet { guard isLoaded else { return }; d.set(shelfTextAsFile, forKey: Keys.shelfTextAsFile) }
+    }
+
+    /// Whether a copy of this kind goes on the Shelf; rich text counts as text.
+    func shelfCollects(_ type: ClipType) -> Bool {
+        shelfForClips && shelfKinds.contains((type == .richText ? ClipType.text : type).rawValue)
     }
 
     /// The bright, short system sounds that read as "done".
@@ -609,6 +632,9 @@ final class Settings {
             Keys.captureSoundName: "Glass",
             Keys.shelfForClips: true,
             Keys.shelfForFolders: true,
+            Keys.shelfKinds: [ClipType.text, .link, .image, .file, .color].map(\.rawValue),
+            Keys.shelfRemoveAfterDrag: true,
+            Keys.shelfTextAsFile: true,
             Keys.promoteOnPaste: false,
             Keys.ignoreConcealed: true,
             Keys.deletePermanently: false,
@@ -654,6 +680,9 @@ final class Settings {
         captureSoundName = d.string(forKey: Keys.captureSoundName) ?? "Glass"
         shelfForClips = d.bool(forKey: Keys.shelfForClips)
         shelfForFolders = d.bool(forKey: Keys.shelfForFolders)
+        shelfKinds = Set(d.stringArray(forKey: Keys.shelfKinds) ?? [])
+        shelfRemoveAfterDrag = d.bool(forKey: Keys.shelfRemoveAfterDrag)
+        shelfTextAsFile = d.bool(forKey: Keys.shelfTextAsFile)
         promoteOnPaste = d.bool(forKey: Keys.promoteOnPaste)
         ignoreConcealed = d.bool(forKey: Keys.ignoreConcealed)
         deletePermanently = d.bool(forKey: Keys.deletePermanently)

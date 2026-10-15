@@ -4,7 +4,7 @@ import AppKit
 /// The sections of the Settings window, listed in its sidebar the way System
 /// Settings lists its panes: a colored icon tile and a name.
 enum SettingsPane: String, CaseIterable, Identifiable {
-    case general, appearance, shortcuts, pasteStack, history, privacy, sync, about
+    case general, appearance, shortcuts, pasteStack, shelf, history, privacy, sync, about
 
     var id: String { rawValue }
 
@@ -14,6 +14,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .appearance: "Appearance"
         case .shortcuts: "Shortcuts"
         case .pasteStack: "Paste Stack"
+        case .shelf: "Shelf"
         case .history: "History"
         case .privacy: "Privacy"
         case .sync: "Sync"
@@ -27,6 +28,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .appearance: "Theme, position and what the cards show."
         case .shortcuts: "Keyboard shortcuts for the bar and quick paste."
         case .pasteStack: "Collect several copies, then paste them in order."
+        case .shelf: "A small window that holds new copies and files until you drag them somewhere."
         case .history: "How long clips are kept, and the data on this Mac."
         case .privacy: "Apps and content Pastely never records."
         case .sync: "Keep history and pinboards in step across your Macs."
@@ -40,6 +42,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .appearance: "paintbrush.fill"
         case .shortcuts: "keyboard.fill"
         case .pasteStack: "square.stack.3d.up.fill"
+        case .shelf: "tray.full.fill"
         case .history: "clock.fill"
         case .privacy: "hand.raised.fill"
         case .sync: "icloud.fill"
@@ -60,6 +63,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .appearance: .pink
         case .shortcuts: .indigo
         case .pasteStack: .blue
+        case .shelf: .teal
         case .history: .orange
         case .privacy: .green
         case .sync: .cyan
@@ -76,15 +80,17 @@ struct SettingsView: View {
     var body: some View {
         NavigationSplitView {
             List(SettingsPane.allCases, selection: $pane) { pane in
-                Label {
-                    Text(pane.title)
-                } icon: {
-                    SettingsIcon(symbol: pane.symbol, tint: pane.tint, size: 22)
+                HStack(spacing: 10) {
+                    SettingsIcon(symbol: pane.symbol, tint: pane.tint, size: 24)
+                    Text(pane.title).font(.system(size: 13.5))
                 }
+                .padding(.vertical, 5)
+                .padding(.leading, 2)
                 .tag(pane)
             }
             .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 190, ideal: 200, max: 220)
+            .environment(\.defaultMinListRowHeight, 38)
+            .navigationSplitViewColumnWidth(min: 210, ideal: 220, max: 240)
         } detail: {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
@@ -108,6 +114,7 @@ struct SettingsView: View {
         case .appearance: AppearanceSettings()
         case .shortcuts: ShortcutSettings()
         case .pasteStack: PasteStackSettings()
+        case .shelf: ShelfSettings()
         case .history: HistorySettings()
         case .privacy: PrivacySettings()
         case .sync: SyncSettings()
@@ -378,12 +385,6 @@ private struct GeneralSettings: View {
                     .labelsHidden()
                     .fixedSize()
                 }
-                SettingsToggle(title: "Put new copies on the Shelf",
-                               detail: "The Shelf is a small window you can move anywhere. Drag items out of it into any app; it closes once it is empty.",
-                               isOn: $settings.shelfForClips)
-                SettingsToggle(title: "Put new files from folder tabs on the Shelf",
-                               detail: "For example each finished download.",
-                               isOn: $settings.shelfForFolders)
                 SettingsToggle(title: "Play a sound when a copy reaches Pastely", isOn: $settings.playSoundOnCapture)
                 SettingsRow(title: "Sound") {
                     Picker("", selection: $settings.captureSoundName) {
@@ -542,6 +543,65 @@ private struct AppearanceSettings: View {
         Binding(
             get: { Color(hex: settings.clipColorAccentHex) ?? .pink },
             set: { settings.clipColorAccentHex = NSColor($0).hexString }
+        )
+    }
+}
+
+private struct ShelfSettings: View {
+    @Bindable private var settings = Settings.shared
+    @Bindable private var shelf = Shelf.shared.model
+
+    private static let kinds: [(type: ClipType, title: String)] = [
+        (.text, "Text"), (.link, "Links"), (.image, "Images"), (.file, "Files"), (.color, "Colors")
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            SettingsCard(title: "What goes on the Shelf",
+                         footer: "The Shelf appears with the first item and stays until you close it or drag everything out.") {
+                SettingsToggle(title: "New copies", isOn: $settings.shelfForClips)
+                ForEach(Self.kinds, id: \.type) { kind in
+                    SettingsToggle(title: kind.title, isOn: kindBinding(kind.type))
+                        .padding(.leading, 18)
+                        .disabled(!settings.shelfForClips)
+                        .opacity(settings.shelfForClips ? 1 : 0.5)
+                }
+                SettingsToggle(title: "New files in folder tabs",
+                               detail: "For example each finished download. Add folders with the + next to the tabs.",
+                               isOn: $settings.shelfForFolders)
+            }
+
+            SettingsCard(title: "Dragging out") {
+                SettingsToggle(title: "Remove items once they are dropped",
+                               detail: "Otherwise they stay on the Shelf until you close it.",
+                               isOn: $settings.shelfRemoveAfterDrag)
+                SettingsToggle(title: "Drop text in Finder as a file",
+                               detail: "Text becomes a .txt file named after its first line, rich text an .rtf file. Text fields still get the text itself.",
+                               isOn: $settings.shelfTextAsFile)
+            }
+
+            SettingsCard(title: "Window",
+                         footer: "Drag the Shelf by any empty spot; it opens where you left it.") {
+                SettingsRow(title: "Items on the Shelf now",
+                            detail: shelf.items.isEmpty ? "The Shelf is empty." : ShelfModel.title(for: shelf.items)) {
+                    Button("Close Shelf") { Shelf.shared.clear() }
+                        .controlSize(.small)
+                        .disabled(shelf.items.isEmpty)
+                }
+                SettingsRow(title: "Position") {
+                    Button("Move to Lower Right") { Shelf.shared.resetPosition() }
+                        .controlSize(.small)
+                }
+            }
+        }
+    }
+
+    private func kindBinding(_ type: ClipType) -> Binding<Bool> {
+        Binding(
+            get: { settings.shelfKinds.contains(type.rawValue) },
+            set: { on in
+                if on { settings.shelfKinds.insert(type.rawValue) } else { settings.shelfKinds.remove(type.rawValue) }
+            }
         )
     }
 }
