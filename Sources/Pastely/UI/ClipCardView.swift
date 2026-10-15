@@ -155,6 +155,13 @@ struct ClipCardView: View {
 
     /// Image clips, and file clips pointing at an image, which is how a copied
     /// screenshot usually arrives, run edge to edge instead of sitting inset.
+    /// The clip, or every selected clip when it is part of a multiple selection.
+    private var stackTargets: [ClipItem] {
+        let selection = store.effectiveSelectionIDs
+        guard selection.count > 1, selection.contains(item.id) else { return [item] }
+        return store.visibleItems.filter { selection.contains($0.id) }
+    }
+
     private var showsImage: Bool {
         ClipPreviewProvider.showsImage(item) && !previewFailed
     }
@@ -453,6 +460,11 @@ struct ClipCardView: View {
 
         Button { AppController.shared.copyItem(item) } label: {
             Label("Copy", systemImage: "doc.on.doc")
+        }
+
+        Button { PasteStack.shared.add(stackTargets) } label: {
+            Label(stackTargets.count > 1 ? "Add \(stackTargets.count) to Paste Stack" : "Add to Paste Stack",
+                  systemImage: "square.stack.3d.up")
         }
 
         Divider()

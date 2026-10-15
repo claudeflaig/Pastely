@@ -169,6 +169,9 @@ struct FavoriteTile: View {
         Button { AppController.shared.copyItem(item) } label: {
             Label("Copy", systemImage: "doc.on.doc")
         }
+        Button { PasteStack.shared.add([item]) } label: {
+            Label("Add to Paste Stack", systemImage: "square.stack.3d.up")
+        }
         Divider()
         Button { store.moveFavorite(item, by: -1) } label: { Label("Move Left", systemImage: "arrow.left") }
             .disabled(store.favorites.first?.id == item.id)

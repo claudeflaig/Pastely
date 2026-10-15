@@ -349,7 +349,12 @@ struct ShelfView: View {
     }
 
     private func menuItems(for items: [ClipItem]) -> [ShelfMenuItem] {
-        var entries = [ShelfMenuItem(title: items.count == 1 ? "Copy" : "Copy All") { ShelfActions.copy(items) }]
+        var entries = [
+            ShelfMenuItem(title: items.count == 1 ? "Copy" : "Copy All") { ShelfActions.copy(items) },
+            ShelfMenuItem(title: items.count == 1 ? "Add to Paste Stack" : "Add All to Paste Stack") {
+                PasteStack.shared.add(items)
+            }
+        ]
         let urls = ShelfModel.fileURLs(of: items)
         if !urls.isEmpty {
             entries.append(ShelfMenuItem(title: "Reveal in Finder") {

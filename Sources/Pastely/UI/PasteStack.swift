@@ -60,6 +60,15 @@ final class PasteStack {
         stageNext()
     }
 
+    /// Adds clips copied earlier, opening the stack if it is closed. They
+    /// join in the order they were copied, after what is already there.
+    func add(_ items: [ClipItem]) {
+        guard !items.isEmpty else { return }
+        open()
+        for item in items.sorted(by: { $0.createdAt < $1.createdAt }) { queue.add(item) }
+        stageNext()
+    }
+
     func remove(_ item: ClipItem) {
         queue.remove(id: item.id)
         stageNext()
@@ -161,6 +170,7 @@ final class PasteStackPanelController {
 
 struct PasteStackView: View {
     @Bindable private var stack = PasteStack.shared
+    @State private var dropTargeted = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -182,8 +192,15 @@ struct PasteStackView: View {
         .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .strokeBorder(Theme.cardBorder)
+                .strokeBorder(dropTargeted ? Theme.selection : Theme.cardBorder, lineWidth: dropTargeted ? 2 : 1)
         )
+        // A card dragged here from the bar joins the stack.
+        .onDrop(of: [.item], isTargeted: $dropTargeted) { _ in
+            guard let item = ClipDragProvider.recentlyDraggedItem else { return false }
+            ClipDragProvider.clearDraggedItem()
+            stack.add([item])
+            return true
+        }
     }
 
     private var header: some View {
