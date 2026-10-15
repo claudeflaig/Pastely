@@ -320,6 +320,9 @@ final class Settings {
         static let plainTextPasteShortcut = "plainTextPasteShortcut"
         static let plainTextPasteKeyCode = "plainTextPasteKeyCode"
         static let plainTextPasteModifiers = "plainTextPasteModifiers"
+        static let captureTextShortcut = "captureTextShortcut"
+        static let captureTextKeyCode = "captureTextKeyCode"
+        static let captureTextModifiers = "captureTextModifiers"
     }
 
     var historyLimit: Int {
@@ -634,6 +637,35 @@ final class Settings {
         HotKeyCenter.describe(keyCode: plainTextPasteKeyCode, modifiers: plainTextPasteModifiers)
     }
 
+    /// Copies the text in a part of the screen the user drags over.
+    var captureTextShortcut: Bool {
+        didSet {
+            guard isLoaded else { return }
+            d.set(captureTextShortcut, forKey: Keys.captureTextShortcut)
+            HotKeyCenter.shared.reloadCaptureTextHotKey()
+        }
+    }
+
+    var captureTextKeyCode: Int {
+        didSet {
+            guard isLoaded else { return }
+            d.set(captureTextKeyCode, forKey: Keys.captureTextKeyCode)
+            HotKeyCenter.shared.reloadCaptureTextHotKey()
+        }
+    }
+
+    var captureTextModifiers: Int {
+        didSet {
+            guard isLoaded else { return }
+            d.set(captureTextModifiers, forKey: Keys.captureTextModifiers)
+            HotKeyCenter.shared.reloadCaptureTextHotKey()
+        }
+    }
+
+    var captureTextHotkeyDisplay: String {
+        HotKeyCenter.describe(keyCode: captureTextKeyCode, modifiers: captureTextModifiers)
+    }
+
     private init() {
         d.register(defaults: [
             Keys.historyLimit: 500,
@@ -686,7 +718,11 @@ final class Settings {
             Keys.pasteStackModifiers: cmdKey | shiftKey,
             Keys.plainTextPasteShortcut: true,
             Keys.plainTextPasteKeyCode: kVK_ANSI_V,
-            Keys.plainTextPasteModifiers: cmdKey | optionKey | shiftKey
+            Keys.plainTextPasteModifiers: cmdKey | optionKey | shiftKey,
+            // Next to the system's ⇧⌘3, ⇧⌘4 and ⇧⌘5, as in TextSniper.
+            Keys.captureTextShortcut: true,
+            Keys.captureTextKeyCode: kVK_ANSI_2,
+            Keys.captureTextModifiers: cmdKey | shiftKey
         ])
         historyLimit = d.integer(forKey: Keys.historyLimit)
         historyRetentionMode = HistoryRetentionMode(rawValue: d.string(forKey: Keys.historyRetentionMode) ?? "")
@@ -741,6 +777,9 @@ final class Settings {
         plainTextPasteShortcut = d.bool(forKey: Keys.plainTextPasteShortcut)
         plainTextPasteKeyCode = d.integer(forKey: Keys.plainTextPasteKeyCode)
         plainTextPasteModifiers = d.integer(forKey: Keys.plainTextPasteModifiers)
+        captureTextShortcut = d.bool(forKey: Keys.captureTextShortcut)
+        captureTextKeyCode = d.integer(forKey: Keys.captureTextKeyCode)
+        captureTextModifiers = d.integer(forKey: Keys.captureTextModifiers)
         isLoaded = true
         if normalizedBarHeight != storedBarHeight {
             d.set(normalizedBarHeight, forKey: Keys.barHeight)

@@ -6,6 +6,14 @@ All notable changes to Pesty are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Capture Text (⇧⌘2): drag over any part of the screen and the text in it is
+  recognized on device and copied, so it also lands in the history. The
+  shortcut can be changed or turned off in Settings → Shortcuts, and the menu
+  bar icon has a Capture Text entry.
+
 ## [1.3.0] - 2026-10-08
 
 The v2 wave of features from @alvst (#80), each reviewed and landed with the

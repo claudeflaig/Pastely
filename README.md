@@ -13,6 +13,7 @@ Pastely ist ein Fork von [Pesty](https://github.com/momenbasel/pesty) von Moamen
 - **CleanShot X**: der Aufnahme-Verlauf erscheint automatisch als eigener Tab
 - **Suche** über Text, Links, Dateien und erkannten Text in Bildern und Screenshots (OCR)
 - **Filter** nach Typ, Quell-App und Datum
+- **Text aus dem Bildschirm kopieren** (⇧⌘2): einen Bereich aufziehen, etwa in einem Foto, Video oder PDF, und der erkannte Text landet in der Zwischenablage
 - **Paste Stack** (⇧⌘C): mehrere Einträge sammeln und mit ⌘V der Reihe nach einfügen
 - Schnelles Einfügen mit ⌘1 bis ⌘9, Bearbeiten und Umbenennen von Karten
 - **Als reiner Text einfügen** (⌥⇧⌘V, in den Einstellungen änderbar): fügt die Zwischenablage überall ohne Formatierung ein

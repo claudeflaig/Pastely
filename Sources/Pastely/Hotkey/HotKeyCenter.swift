@@ -10,14 +10,18 @@ final class HotKeyCenter {
     var onStackTrigger: (() -> Void)?
     /// Fired by the Paste as Plain Text shortcut, ⌥⇧⌘V by default.
     var onPlainTextTrigger: (() -> Void)?
+    /// Fired by the Capture Text shortcut, ⇧⌘2 by default.
+    var onCaptureTextTrigger: (() -> Void)?
 
     private static let barHotKeyID: UInt32 = 1
     private static let stackHotKeyID: UInt32 = 2
     private static let plainTextHotKeyID: UInt32 = 3
+    private static let captureTextHotKeyID: UInt32 = 4
 
     private var hotKeyRef: EventHotKeyRef?
     private var stackHotKeyRef: EventHotKeyRef?
     private var plainTextHotKeyRef: EventHotKeyRef?
+    private var captureTextHotKeyRef: EventHotKeyRef?
     private var handlerRef: EventHandlerRef?
     private let signature: OSType = 0x50535459
 
@@ -28,6 +32,7 @@ final class HotKeyCenter {
         reload()
         reloadStackHotKey()
         reloadPlainTextHotKey()
+        reloadCaptureTextHotKey()
     }
 
     /// ⇧⌘C is also taken by some apps (Finder's Computer, browser inspectors),
@@ -61,6 +66,20 @@ final class HotKeyCenter {
         #endif
     }
 
+    func reloadCaptureTextHotKey() {
+        if let ref = captureTextHotKeyRef { UnregisterEventHotKey(ref); captureTextHotKeyRef = nil }
+        #if !MAS
+        guard Settings.shared.captureTextShortcut, Settings.shared.captureTextKeyCode != 0 else { return }
+        let id = EventHotKeyID(signature: signature, id: Self.captureTextHotKeyID)
+        var ref: EventHotKeyRef?
+        if RegisterEventHotKey(UInt32(Settings.shared.captureTextKeyCode),
+                               UInt32(Settings.shared.captureTextModifiers), id,
+                               GetApplicationEventTarget(), 0, &ref) == noErr {
+            captureTextHotKeyRef = ref
+        }
+        #endif
+    }
+
     private func installHandlerIfNeeded() {
         guard handlerRef == nil else { return }
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard),
@@ -76,6 +95,8 @@ final class HotKeyCenter {
                     HotKeyCenter.shared.onStackTrigger?()
                 } else if id == HotKeyCenter.plainTextHotKeyID {
                     HotKeyCenter.shared.onPlainTextTrigger?()
+                } else if id == HotKeyCenter.captureTextHotKeyID {
+                    HotKeyCenter.shared.onCaptureTextTrigger?()
                 } else {
                     HotKeyCenter.shared.onTrigger?()
                 }
