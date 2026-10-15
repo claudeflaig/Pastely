@@ -96,7 +96,7 @@ struct ClipItem: Identifiable, Codable, Equatable {
     /// six or eight digits; nil for anything else. The "#" is required, so a
     /// word like "bad" or a code like "123456" stays text.
     static func hexColor(in text: String) -> String? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = text.trimmingCharacters(in: invisibleEdges)
         guard trimmed.hasPrefix("#") else { return nil }
         let digits = trimmed.dropFirst().uppercased()
         guard [3, 6, 8].contains(digits.count), digits.allSatisfy(\.isHexDigit) else { return nil }
@@ -104,13 +104,21 @@ struct ClipItem: Identifiable, Codable, Equatable {
         return "#" + full
     }
 
+    /// Some apps put invisible characters around a copy: Claude a control
+    /// character in front, web pages zero-width spaces.
+    private static let invisibleEdges = CharacterSet.whitespacesAndNewlines
+        .union(.controlCharacters)
+        .union(CharacterSet(charactersIn: "\u{200B}\u{200C}\u{200D}\u{2060}\u{FEFF}"))
+
     /// A text clip that is only a hex code, as a color clip that shows the
-    /// color. The text stays, so search and plain-text paste are unchanged.
+    /// color. The text stays as typed, minus invisible characters around it,
+    /// so search and plain-text paste are unchanged.
     func recognizingHexColor() -> ClipItem {
         guard type == .text || type == .richText, let text, let hex = Self.hexColor(in: text) else { return self }
         var item = self
         item.type = .color
         item.colorHex = hex
+        item.text = text.trimmingCharacters(in: Self.invisibleEdges)
         item.rtfData = nil
         item.htmlData = nil
         return item

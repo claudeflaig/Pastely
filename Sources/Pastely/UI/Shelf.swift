@@ -2,6 +2,7 @@ import AppKit
 import Observation
 import QuickLookThumbnailing
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// A small window that collects new copies and new files from folder tabs,
 /// as Dropover's shelf does. It stays until it is closed or emptied: drag
@@ -509,6 +510,28 @@ enum ShelfActions {
         AppController.shared.monitor.suppressUntilChangeCount = pasteboard.changeCount
     }
 
+    /// What a dragged item offers. Text, rich text and colors arrive in
+    /// Finder as a file named after their first line, and in a text field
+    /// as their text; everything else as in `writers(for:)`.
+    static func dragWriters(for item: ClipItem) -> [NSPasteboardWriting] {
+        switch item.type {
+        case .text, .color:
+            let text = item.plainText ?? ""
+            return [ShelfTextFile(name: ShelfTextFile.fileName(for: text, fallback: "Text"), ext: "txt",
+                                  type: .plainText, data: Data(text.utf8), text: text)]
+        case .richText:
+            let text = item.text ?? ""
+            if let rtf = item.rtfData {
+                return [ShelfTextFile(name: ShelfTextFile.fileName(for: text, fallback: "Text"), ext: "rtf",
+                                      type: .rtf, data: rtf, text: text)]
+            }
+            return [ShelfTextFile(name: ShelfTextFile.fileName(for: text, fallback: "Text"), ext: "txt",
+                                  type: .plainText, data: Data(text.utf8), text: text)]
+        default:
+            return writers(for: item)
+        }
+    }
+
     /// What a dragged or copied item puts on the pasteboard. Images go as a
     /// file with a readable name, so Finder and Mail receive a real file.
     static func writers(for item: ClipItem) -> [NSPasteboardWriting] {
@@ -620,7 +643,7 @@ final class ShelfDragSourceView: NSView, NSDraggingSource {
         draggedItems = items
         let image = dragImage()
         var draggingItems: [NSDraggingItem] = []
-        for (index, writer) in items.flatMap(ShelfActions.writers(for:)).enumerated() {
+        for (index, writer) in items.flatMap(ShelfActions.dragWriters(for:)).enumerated() {
             let draggingItem = NSDraggingItem(pasteboardWriter: writer)
             let offset = CGFloat(min(index, 4)) * 6
             let frame = NSRect(x: bounds.midX - 32 + offset, y: bounds.midY - 32 - offset, width: 64, height: 64)
@@ -680,5 +703,70 @@ private struct WindowDragArea: NSViewRepresentable {
     private final class MoveView: NSView {
         override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
         override func mouseDown(with event: NSEvent) { window?.performDrag(with: event) }
+    }
+}
+
+/// A text clip on its way out of the Shelf: a file for Finder, written when
+/// it is dropped, and plain text for anything that takes text.
+final class ShelfTextFile: NSFilePromiseProvider, NSFilePromiseProviderDelegate {
+    private let name: String
+    private let data: Data
+    private let text: String
+
+    init(name: String, ext: String, type: UTType, data: Data, text: String) {
+        self.name = "\(name).\(ext)"
+        self.data = data
+        self.text = text
+        super.init()
+        fileType = type.identifier
+        delegate = self
+    }
+
+    /// The first line, cut to a sensible length and cleared of characters
+    /// a file name cannot hold.
+    static func fileName(for text: String, fallback: String) -> String {
+        let firstLine = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+        let cleaned = firstLine
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+            .trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ".")))
+        let short = String(cleaned.prefix(60)).trimmingCharacters(in: .whitespaces)
+        return short.isEmpty ? fallback : short
+    }
+
+    override func writableTypes(for pasteboard: NSPasteboard) -> [NSPasteboard.PasteboardType] {
+        super.writableTypes(for: pasteboard) + [.string]
+    }
+
+    override func pasteboardPropertyList(forType type: NSPasteboard.PasteboardType) -> Any? {
+        type == .string ? text : super.pasteboardPropertyList(forType: type)
+    }
+
+    func filePromiseProvider(_ filePromiseProvider: NSFilePromiseProvider, fileNameForType fileType: String) -> String {
+        name
+    }
+
+    func filePromiseProvider(_ filePromiseProvider: NSFilePromiseProvider, writePromiseTo url: URL,
+                             completionHandler: @escaping (Error?) -> Void) {
+        do {
+            try data.write(to: Self.freeURL(near: url), options: .withoutOverwriting)
+            completionHandler(nil)
+        } catch {
+            completionHandler(error)
+        }
+    }
+
+    /// "Notiz.txt", or "Notiz 2.txt" when that name is taken.
+    static func freeURL(near url: URL) -> URL {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: url.path) else { return url }
+        let base = url.deletingPathExtension().lastPathComponent
+        let folder = url.deletingLastPathComponent()
+        var n = 2
+        while true {
+            let candidate = folder.appendingPathComponent("\(base) \(n)").appendingPathExtension(url.pathExtension)
+            if !fm.fileExists(atPath: candidate.path) { return candidate }
+            n += 1
+        }
     }
 }

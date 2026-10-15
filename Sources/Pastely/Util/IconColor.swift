@@ -70,4 +70,34 @@ enum IconColor {
                          alpha: a)
         }
     }
+
+    // MARK: - Telling apps of one color apart
+
+    /// Which of twelve 30° hue families a color belongs to; -1 for grays.
+    static func family(of color: NSColor) -> Int {
+        guard let c = color.usingColorSpace(.sRGB) else { return -1 }
+        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
+        c.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
+        guard s > 0.25 else { return -1 }
+        return Int((h * 12 + 0.5).rounded(.down)) % 12
+    }
+
+    /// The `index`-th app in a hue family gets a neighboring shade, so five
+    /// blue icons become blue, indigo, cyan, navy and violet instead of five
+    /// times the same blue. Index 0 keeps the icon's own color.
+    static func variant(of color: NSColor, index: Int) -> NSColor {
+        guard index > 0, let c = color.usingColorSpace(.sRGB) else { return color }
+        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
+        c.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
+        let steps: [(hue: CGFloat, saturation: CGFloat, brightness: CGFloat)] = [
+            (0.07, 0.95, 0.62), (-0.06, 1.0, 0.74), (0, 0.85, 0.48),
+            (0.12, 0.85, 0.70), (-0.11, 0.9, 0.56), (0.035, 0.7, 0.80)
+        ]
+        let step = steps[(index - 1) % steps.count]
+        // Past the list, nudge a little further so repeats still differ.
+        let lap = CGFloat((index - 1) / steps.count) * 0.02
+        let hue = (h + step.hue + lap + 1).truncatingRemainder(dividingBy: 1)
+        return NSColor(hue: hue, saturation: min(0.95, max(0.3, s * step.saturation)),
+                       brightness: step.brightness, alpha: 1)
+    }
 }

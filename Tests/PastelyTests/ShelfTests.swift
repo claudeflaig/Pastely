@@ -28,3 +28,22 @@ final class ShelfTests: XCTestCase {
         XCTAssertEqual(model.items.map(\.id), [b.id])
     }
 }
+
+final class ShelfTextFileTests: XCTestCase {
+    func testFileNameIsTheFirstLineMadeSafe() {
+        XCTAssertEqual(ShelfTextFile.fileName(for: "Shelf-Test eins", fallback: "Text"), "Shelf-Test eins")
+        XCTAssertEqual(ShelfTextFile.fileName(for: "a/b: c\nzweite Zeile", fallback: "Text"), "a-b- c")
+        XCTAssertEqual(ShelfTextFile.fileName(for: "   \n", fallback: "Text"), "Text")
+        XCTAssertEqual(ShelfTextFile.fileName(for: String(repeating: "x", count: 100), fallback: "Text").count, 60)
+    }
+
+    func testTakenNameGetsANumber() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let url = folder.appendingPathComponent("Notiz.txt")
+        XCTAssertEqual(ShelfTextFile.freeURL(near: url), url)
+        try Data().write(to: url)
+        XCTAssertEqual(ShelfTextFile.freeURL(near: url).lastPathComponent, "Notiz 2.txt")
+    }
+}

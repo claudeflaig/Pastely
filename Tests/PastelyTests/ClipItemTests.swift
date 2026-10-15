@@ -27,6 +27,9 @@ final class HexColorRecognitionTests: XCTestCase {
         XCTAssertEqual(ClipItem.hexColor(in: " #2b3742\n"), "#2B3742")
         XCTAssertEqual(ClipItem.hexColor(in: "#fa0"), "#FFAA00")
         XCTAssertEqual(ClipItem.hexColor(in: "#2B3742CC"), "#2B3742CC")
+        // As Claude copies it, with a control character in front.
+        XCTAssertEqual(ClipItem.hexColor(in: "\u{01}#E9E9F3"), "#E9E9F3")
+        XCTAssertEqual(ClipItem.hexColor(in: "\u{FEFF}#e9e9f3\u{200B}"), "#E9E9F3")
     }
 
     func testLeavesOtherTextAlone() {
@@ -42,5 +45,6 @@ final class HexColorRecognitionTests: XCTestCase {
         XCTAssertEqual(clip.colorHex, "#D78B60")
         XCTAssertEqual(clip.plainText, "#D78B60")
         XCTAssertEqual(ClipItem(type: .text, text: "Hallo").recognizingHexColor().type, .text)
+        XCTAssertEqual(ClipItem(type: .text, text: "\u{01}#e9e9f3").recognizingHexColor().plainText, "#e9e9f3")
     }
 }

@@ -31,3 +31,28 @@ final class IconColorTests: XCTestCase {
         XCTAssertLessThanOrEqual(b, 0.82)
     }
 }
+
+final class IconColorVariantTests: XCTestCase {
+    private let blue = NSColor(srgbRed: 0.04, green: 0.5, blue: 0.82, alpha: 1)
+
+    func testFirstAppKeepsItsColor() {
+        XCTAssertEqual(IconColor.variant(of: blue, index: 0), blue)
+    }
+
+    func testLaterAppsOfTheSameFamilyDiffer() {
+        let colors = (0..<6).map { IconColor.variant(of: blue, index: $0).usingColorSpace(.sRGB)! }
+        for i in colors.indices {
+            for j in colors.indices where j > i {
+                let distance = abs(colors[i].redComponent - colors[j].redComponent)
+                    + abs(colors[i].greenComponent - colors[j].greenComponent)
+                    + abs(colors[i].blueComponent - colors[j].blueComponent)
+                XCTAssertGreaterThan(distance, 0.12, "variants \(i) and \(j) look alike")
+            }
+        }
+    }
+
+    func testFamiliesSeparateBlueFromOrangeAndGray() {
+        XCTAssertNotEqual(IconColor.family(of: blue), IconColor.family(of: .orange))
+        XCTAssertEqual(IconColor.family(of: NSColor(white: 0.5, alpha: 1)), -1)
+    }
+}

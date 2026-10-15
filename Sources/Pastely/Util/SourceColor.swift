@@ -64,10 +64,24 @@ enum SourceColor {
     private static func iconColor(for bundleID: String?) -> Color {
         let key = bundleID ?? ""
         if let cached = iconColors[key] { return cached }
-        let color = IconColor.of(AppIconProvider.icon(forBundleID: bundleID))
-            .map { Color(nsColor: $0) } ?? neutralIconColor
+        let base = IconColor.of(AppIconProvider.icon(forBundleID: bundleID)) ?? NSColor(neutralIconColor)
+        let color = Color(nsColor: IconColor.variant(of: base, index: iconVariant(for: key, base: base)))
         iconColors[key] = color
         return color
+    }
+
+    private static let variantKey = "iconColorVariants"
+
+    /// Each app's place among the apps of its color family, assigned on
+    /// first sight and kept, so an app's card color never changes.
+    private static func iconVariant(for bundleID: String, base: NSColor) -> Int {
+        var stored = UserDefaults.standard.dictionary(forKey: variantKey) as? [String: [Int]] ?? [:]
+        if let entry = stored[bundleID], entry.count == 2 { return entry[1] }
+        let family = IconColor.family(of: base)
+        let index = stored.values.filter { $0.first == family }.count
+        stored[bundleID] = [family, index]
+        UserDefaults.standard.set(stored, forKey: variantKey)
+        return index
     }
 
     /// The ten deterministic shades for a given accent color, used by
