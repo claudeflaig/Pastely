@@ -47,3 +47,19 @@ final class ShelfTextFileTests: XCTestCase {
         XCTAssertEqual(ShelfTextFile.freeURL(near: url).lastPathComponent, "Notiz 2.txt")
     }
 }
+
+@MainActor
+final class ShelfDragImageTests: XCTestCase {
+    func testTextDragImageIsVisible() throws {
+        let image = ShelfThumbnails.dragImage(for: ClipItem(type: .text, text: "Shelf-Test"), side: 72)
+        let cg = try XCTUnwrap(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let rep = NSBitmapImageRep(cgImage: cg)
+        var opaque = 0
+        for x in stride(from: 0, to: rep.pixelsWide, by: 4) {
+            for y in stride(from: 0, to: rep.pixelsHigh, by: 4) where (rep.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.5 {
+                opaque += 1
+            }
+        }
+        XCTAssertGreaterThan(opaque, 20, "the drag image is blank")
+    }
+}

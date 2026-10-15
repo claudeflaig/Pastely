@@ -470,6 +470,19 @@ enum ShelfThumbnails {
         cache.setObject(image, forKey: key)
         return image
     }
+
+    /// A picture of the item for the drag: its loaded thumbnail when there is
+    /// one, otherwise the page, swatch or icon the Shelf draws for it.
+    static func dragImage(for item: ClipItem, side: CGFloat) -> NSImage {
+        if let url = ShelfModel.fileURLs(of: [item]).first {
+            for size in [84, 72, 28] {
+                if let cached = cache.object(forKey: "\(url.path)|\(size)" as NSString) { return cached }
+            }
+        }
+        let renderer = ImageRenderer(content: ShelfThumbnail(item: item, side: side).padding(4))
+        renderer.scale = NSScreen.main?.backingScaleFactor ?? 2
+        return renderer.nsImage ?? NSWorkspace.shared.icon(for: .data)
+    }
 }
 
 enum ShelfItemText {
@@ -651,29 +664,24 @@ final class ShelfDragSourceView: NSView, NSDraggingSource {
         let items = self.items()
         guard !items.isEmpty else { return }
         draggedItems = items
-        let image = dragImage()
+        // Under the pointer, each item's own picture, fanned out a little.
+        let pointer = convert(event.locationInWindow, from: nil)
+        let side: CGFloat = 72
         var draggingItems: [NSDraggingItem] = []
-        for (index, writer) in items.flatMap(ShelfActions.dragWriters(for:)).enumerated() {
-            let draggingItem = NSDraggingItem(pasteboardWriter: writer)
-            let offset = CGFloat(min(index, 4)) * 6
-            let frame = NSRect(x: bounds.midX - 32 + offset, y: bounds.midY - 32 - offset, width: 64, height: 64)
-            draggingItem.setDraggingFrame(frame, contents: index == 0 ? image : nil)
-            draggingItems.append(draggingItem)
+        for (index, item) in items.reversed().enumerated() {
+            let image = MainActor.assumeIsolated { ShelfThumbnails.dragImage(for: item, side: side) }
+            for (writerIndex, writer) in ShelfActions.dragWriters(for: item).enumerated() {
+                let draggingItem = NSDraggingItem(pasteboardWriter: writer)
+                let offset = CGFloat(min(index, 4)) * 8
+                let frame = NSRect(x: pointer.x - side / 2 + offset, y: pointer.y - side / 2 - offset,
+                                   width: side, height: side)
+                draggingItem.setDraggingFrame(frame, contents: writerIndex == 0 ? image : nil)
+                draggingItems.append(draggingItem)
+            }
         }
         let session = beginDraggingSession(with: draggingItems, event: event, source: self)
         session.animatesToStartingPositionsOnCancelOrFail = true
         session.draggingFormation = .pile
-    }
-
-    /// What is under the pointer, as the drag image.
-    private func dragImage() -> NSImage {
-        guard let superview, let rep = superview.bitmapImageRepForCachingDisplay(in: frame) else {
-            return NSImage(size: NSSize(width: 64, height: 64))
-        }
-        superview.cacheDisplay(in: frame, to: rep)
-        let image = NSImage(size: NSSize(width: 64, height: 64))
-        image.addRepresentation(rep)
-        return image
     }
 
     func draggingSession(_ session: NSDraggingSession,
