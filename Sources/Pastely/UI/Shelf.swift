@@ -301,23 +301,28 @@ struct ShelfView: View {
         .overlay { dragSource(for: item) }
     }
 
+    /// Clicked through the same AppKit view as the tiles: a SwiftUI Button in
+    /// the horizontal scroll view of this non-activating panel never fired.
     private var revealTile: some View {
-        Button { NSWorkspace.shared.activateFileViewerSelecting(ShelfModel.fileURLs(of: model.items)) } label: {
-            VStack(spacing: 5) {
-                Image(systemName: "arrowshape.turn.up.right.circle")
-                    .font(.system(size: 40, weight: .ultraLight))
-                    .foregroundStyle(Theme.chromeTextSecondary)
-                    .frame(height: 92)
-                Text("Reveal in Finder")
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundStyle(Theme.chromeTextPrimary)
-                Text(" ").font(.system(size: 11))
-            }
-            .frame(width: 112)
-            .padding(.vertical, 4)
-            .contentShape(Rectangle())
+        VStack(spacing: 5) {
+            Image(systemName: "arrowshape.turn.up.right.circle")
+                .font(.system(size: 40, weight: .ultraLight))
+                .foregroundStyle(Theme.chromeTextSecondary)
+                .frame(height: 92)
+            Text("Reveal in Finder")
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(Theme.chromeTextPrimary)
+            Text(" ").font(.system(size: 11))
         }
-        .buttonStyle(.plain)
+        .frame(width: 112)
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .overlay {
+            ShelfDragSource(items: { [] },
+                            onClick: { NSWorkspace.shared.activateFileViewerSelecting(ShelfModel.fileURLs(of: model.items)) },
+                            onDragged: { _ in })
+        }
+        .help("Show the files in Finder")
     }
 
     private func dragSource(for item: ClipItem) -> some View {
