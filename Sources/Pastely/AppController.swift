@@ -471,6 +471,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         hideBar()
         let previousChange = NSPasteboard.general.changeCount
         PasteService.paste(item, into: target, monitor: monitor, format: format)
+        Shelf.shared.notePasted(item)
         if Settings.shared.promoteOnPaste, NSPasteboard.general.changeCount != previousChange {
             store.promoteCopiedItem(item)
         }
