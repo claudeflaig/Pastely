@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import Observation
 import QuickLookThumbnailing
 import SwiftUI
@@ -14,6 +15,10 @@ final class Shelf {
 
     let model = ShelfModel()
     private var panel: NSPanel?
+    /// Copies on the Shelf, by item, with the pasteboard change that put
+    /// them there; only these leave it again once they are pasted.
+    private var copies: [UUID: Int] = [:]
+    private var keyMonitor: Any?
 
     // As tall as the Paste Stack; open, the items line up in a row like its cards.
     private static let collapsedSize = NSSize(width: 236, height: 214)
@@ -21,11 +26,64 @@ final class Shelf {
     private static let positionKey = "shelfTopLeft"
 
     private init() {
-        model.onChange = { [weak self] in self?.layout() }
+        model.onChange = { [weak self] in
+            self?.layout()
+            self?.syncKeyMonitor()
+        }
     }
 
     func add(_ item: ClipItem) {
         model.add(item)
+    }
+
+    /// A copy taken off the pasteboard at `change`, so a later ⌘V of it can
+    /// take it off the Shelf again.
+    func add(_ item: ClipItem, copiedAt change: Int) {
+        model.add(item)
+        copies[item.id] = change
+        syncKeyMonitor()
+    }
+
+    /// Pastely pasted `item` itself, from the bar or a menu.
+    func notePasted(_ item: ClipItem) {
+        guard Settings.shared.shelfRemoveAfterPaste else { return }
+        let pasted = model.items.filter { copies[$0.id] != nil && ($0.id == item.id || $0.sameContent(as: item)) }
+        guard !pasted.isEmpty else { return }
+        model.remove(pasted)
+    }
+
+    /// ⌘V in another app pastes what is on the pasteboard, which is a Shelf
+    /// copy only while nothing has been copied since.
+    private func noteCommandV() {
+        guard Settings.shared.shelfRemoveAfterPaste else { return }
+        let change = NSPasteboard.general.changeCount
+        let pasted = model.items.filter { copies[$0.id] == change }
+        guard !pasted.isEmpty else { return }
+        // Removed a moment later, once the app has read the pasteboard; the
+        // pasteboard itself keeps the copy either way.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            self?.model.remove(pasted)
+        }
+    }
+
+    /// Listens for ⌘V only while a copy is on the Shelf. A global monitor
+    /// needs the Accessibility grant and sees nothing without it.
+    private func syncKeyMonitor() {
+        copies = copies.filter { id, _ in model.items.contains { $0.id == id } }
+        let wanted = !copies.isEmpty && Settings.shared.shelfRemoveAfterPaste
+        if wanted, keyMonitor == nil {
+            keyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { event in
+                let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                guard event.keyCode == UInt16(kVK_ANSI_V),
+                      flags.contains(.command),
+                      !flags.contains(.control),
+                      !event.isARepeat else { return }
+                MainActor.assumeIsolated { Shelf.shared.noteCommandV() }
+            }
+        } else if !wanted, let monitor = keyMonitor {
+            NSEvent.removeMonitor(monitor)
+            keyMonitor = nil
+        }
     }
 
     func clear() { model.clear() }

@@ -623,6 +623,12 @@ private struct ShelfSettings: View {
                                isOn: $settings.shelfTextAsFile)
             }
 
+            SettingsCard(title: "Pasting") {
+                SettingsToggle(title: "Remove copies once they are pasted",
+                               detail: "A copy that went on the Shelf leaves it when you paste it with ⌘V or from Pastely. Files from watched folders stay.",
+                               isOn: $settings.shelfRemoveAfterPaste)
+            }
+
             SettingsCard(title: "Window",
                          footer: "Drag the Shelf by any empty spot; it opens where you left it.") {
                 SettingsRow(title: "Items on the Shelf now",

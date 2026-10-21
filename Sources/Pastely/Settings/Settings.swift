@@ -292,6 +292,7 @@ final class Settings {
         static let shelfWatchedFolders = "shelfWatchedFolders"
         static let shelfRemoveAfterDrag = "shelfRemoveAfterDrag"
         static let shelfTextAsFile = "shelfTextAsFile"
+        static let shelfRemoveAfterPaste = "shelfRemoveAfterPaste"
         static let promoteOnPaste = "promoteOnPaste"
         static let ignoreConcealed = "ignoreConcealed"
         static let deletePermanently = "deletePermanently"
@@ -446,6 +447,11 @@ final class Settings {
     /// Whatever lands somewhere when dragged out leaves the Shelf.
     var shelfRemoveAfterDrag: Bool {
         didSet { guard isLoaded else { return }; d.set(shelfRemoveAfterDrag, forKey: Keys.shelfRemoveAfterDrag) }
+    }
+
+    /// A copy that went on the Shelf leaves it once it is pasted somewhere.
+    var shelfRemoveAfterPaste: Bool {
+        didSet { guard isLoaded else { return }; d.set(shelfRemoveAfterPaste, forKey: Keys.shelfRemoveAfterPaste) }
     }
 
     /// Text dragged into Finder becomes a .txt file instead of a text clipping.
@@ -692,6 +698,7 @@ final class Settings {
             Keys.shelfForOtherDevices: true,
             Keys.shelfRemoveAfterDrag: true,
             Keys.shelfTextAsFile: true,
+            Keys.shelfRemoveAfterPaste: true,
             Keys.promoteOnPaste: false,
             Keys.ignoreConcealed: true,
             Keys.deletePermanently: false,
@@ -746,6 +753,7 @@ final class Settings {
         shelfWatchedFolders = d.stringArray(forKey: Keys.shelfWatchedFolders) ?? []
         shelfRemoveAfterDrag = d.bool(forKey: Keys.shelfRemoveAfterDrag)
         shelfTextAsFile = d.bool(forKey: Keys.shelfTextAsFile)
+        shelfRemoveAfterPaste = d.bool(forKey: Keys.shelfRemoveAfterPaste)
         promoteOnPaste = d.bool(forKey: Keys.promoteOnPaste)
         ignoreConcealed = d.bool(forKey: Keys.ignoreConcealed)
         deletePermanently = d.bool(forKey: Keys.deletePermanently)

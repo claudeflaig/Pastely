@@ -44,7 +44,7 @@ final class ClipboardMonitor {
         if Settings.shared.playSoundOnCapture { Self.playCaptureSound() }
         let settings = Settings.shared
         if (fromOtherDevice && settings.shelfForOtherDevices) || settings.shelfCollects(item.type) {
-            Shelf.shared.add(item)
+            Shelf.shared.add(item, copiedAt: current)
         }
     }
 
