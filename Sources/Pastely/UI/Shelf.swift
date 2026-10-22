@@ -24,11 +24,19 @@ final class Shelf {
     private static let collapsedSize = NSSize(width: 236, height: 214)
     private static let expandedSize = NSSize(width: 560, height: 214)
     private static let positionKey = "shelfTopLeft"
+    /// Posted by Screeny when a capture is dropped somewhere, with the
+    /// files' paths under "paths".
+    private static let filesUsed = Notification.Name("ch.claudeflaig.pastely.didUseFiles")
 
     private init() {
         model.onChange = { [weak self] in
             self?.layout()
             self?.syncKeyMonitor()
+        }
+        DistributedNotificationCenter.default().addObserver(forName: Self.filesUsed, object: nil,
+                                                            queue: .main) { note in
+            let paths = note.userInfo?["paths"] as? [String] ?? []
+            MainActor.assumeIsolated { Shelf.shared.noteFilesUsed(paths) }
         }
     }
 
@@ -64,6 +72,23 @@ final class Shelf {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
             self?.model.remove(pasted)
         }
+    }
+
+    /// Another app dropped these files somewhere, which uses a copy of them
+    /// as much as pasting it does.
+    private func noteFilesUsed(_ paths: [String]) {
+        guard Settings.shared.shelfRemoveAfterPaste else { return }
+        let used = Set(paths.map(Self.canonicalPath))
+        let pasted = model.items.filter { item in
+            copies[item.id] != nil
+                && ShelfModel.fileURLs(of: [item]).contains { used.contains(Self.canonicalPath($0.path)) }
+        }
+        guard !pasted.isEmpty else { return }
+        model.remove(pasted)
+    }
+
+    private static func canonicalPath(_ path: String) -> String {
+        URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL.path
     }
 
     /// Listens for ⌘V only while a copy is on the Shelf. A global monitor
