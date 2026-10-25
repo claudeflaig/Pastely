@@ -38,8 +38,8 @@ final class ClipboardMonitor {
         if current == suppressUntilChangeCount { return }
         // Universal Clipboard marks what arrives from another device.
         let fromOtherDevice = pasteboard.types?.contains(Self.remoteClipboardType) ?? false
-        guard let item = makeItem() else { return }
-        ClipboardStore.shared.addCaptured(item)
+        guard let captured = makeItem() else { return }
+        let item = ClipboardStore.shared.addCaptured(captured)
         PasteStack.shared.capture(item)
         if Settings.shared.playSoundOnCapture { Self.playCaptureSound() }
         let settings = Settings.shared
