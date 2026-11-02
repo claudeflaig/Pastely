@@ -35,7 +35,10 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        #if !SUITE
+        // In the suite, SwiftUI owns the main menu.
         installMainMenu()
+        #endif
 
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(appActivated(_:)),
@@ -241,6 +244,10 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func setMenuBarIconVisible(_ visible: Bool) {
+        #if SUITE
+        // The suite shows only Whispy's icon, which hosts Pastely's menu items.
+        return
+        #endif
         if visible {
             setupStatusItem()
         } else if let item = statusItem {
