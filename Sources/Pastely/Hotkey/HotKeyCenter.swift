@@ -23,7 +23,8 @@ final class HotKeyCenter {
     private var plainTextHotKeyRef: EventHotKeyRef?
     private var captureTextHotKeyRef: EventHotKeyRef?
     private var handlerRef: EventHandlerRef?
-    private let signature: OSType = 0x50535459
+    nonisolated static let hotKeySignature: OSType = 0x50535459
+    private let signature = HotKeyCenter.hotKeySignature
 
     private init() {}
 
@@ -89,6 +90,10 @@ final class HotKeyCenter {
             GetEventParameter(event, EventParamName(kEventParamDirectObject),
                               EventParamType(typeEventHotKeyID), nil,
                               MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
+            // Hotkeys of other code in this process share the handler chain.
+            guard hotKeyID.signature == HotKeyCenter.hotKeySignature else {
+                return OSStatus(eventNotHandledErr)
+            }
             let id = hotKeyID.id
             DispatchQueue.main.async {
                 if id == HotKeyCenter.stackHotKeyID {
