@@ -366,7 +366,9 @@ private struct GeneralSettings: View {
 
             SettingsCard(title: "Startup") {
                 SettingsToggle(title: "Launch at login", isOn: $settings.launchAtLogin)
+                #if !SUITE
                 SettingsToggle(title: "Show Pastely in the menu bar", isOn: $settings.showMenuBarIcon)
+                #endif
             }
 
             SettingsCard(title: "Pasting") {

@@ -1,5 +1,6 @@
 import AppKit
 
+#if !SUITE
 @main
 struct PastelyMain {
     static func main() {
@@ -9,3 +10,4 @@ struct PastelyMain {
         app.run()
     }
 }
+#endif
