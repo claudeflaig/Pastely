@@ -2,6 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 import Observation
 import QuickLookThumbnailing
+import QuickLookUI
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -19,6 +20,8 @@ final class Shelf {
     /// them there; only these leave it again once they are pasted.
     private var copies: [UUID: Int] = [:]
     private var keyMonitor: Any?
+    /// Space, Escape and the arrow keys while the Shelf or its preview is key.
+    private var shelfKeyMonitor: Any?
 
     // As tall as the Paste Stack; open, the items line up in a row like its cards.
     private static let collapsedSize = NSSize(width: 236, height: 214)
@@ -113,6 +116,91 @@ final class Shelf {
 
     func clear() { model.clear() }
 
+    // MARK: Selection and Quick Look
+
+    /// A click on an item selects it and gives the Shelf the keyboard, for
+    /// Space, without bringing Pastely to the front.
+    func select(_ item: ClipItem) {
+        model.selectedID = item.id
+        panel?.makeKey()
+    }
+
+    /// The items in the order the open Shelf shows them, newest first.
+    private var shownItems: [ClipItem] { model.items.reversed() }
+
+    private func handleShelfKey(_ event: NSEvent) -> Bool {
+        let quickLook = ShelfQuickLook.shared
+        let inShelf = event.window != nil && event.window === panel
+        let inPreview = event.window is QLPreviewPanel && quickLook.isShown
+        guard inShelf || inPreview else { return false }
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            .subtracting([.capsLock, .numericPad, .function])
+        guard flags.isEmpty else { return false }
+
+        switch Int(event.keyCode) {
+        case kVK_Space:
+            if quickLook.isShown { quickLook.dismiss() } else { quickLookSelection() }
+            return true
+        case kVK_Escape:
+            if quickLook.isShown {
+                quickLook.dismiss()
+            } else if model.selectedID != nil {
+                model.selectedID = nil
+            } else {
+                return false
+            }
+            return true
+        case kVK_LeftArrow, kVK_UpArrow, kVK_RightArrow, kVK_DownArrow:
+            // In the preview the arrows page through the files themselves.
+            guard inShelf, model.expanded else { return false }
+            let step = [kVK_LeftArrow, kVK_UpArrow].contains(Int(event.keyCode)) ? -1 : 1
+            moveSelection(by: step)
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func moveSelection(by step: Int) {
+        let items = shownItems
+        guard !items.isEmpty else { return }
+        let current = items.firstIndex { $0.id == model.selectedID }
+        let next = current.map { min(max($0 + step, 0), items.count - 1) } ?? (step > 0 ? 0 : items.count - 1)
+        model.selectedID = items[next].id
+    }
+
+    /// Previews every file on the Shelf, starting with the selected item's,
+    /// so the arrow keys in Quick Look move on to the others.
+    private func quickLookSelection() {
+        guard let selected = model.selectedID else { NSSound.beep(); return }
+        var urls: [URL] = []
+        var owners: [UUID] = []
+        var start: Int?
+        for item in shownItems {
+            for url in ShelfQuickLook.previewURLs(for: item) {
+                if item.id == selected, start == nil { start = urls.count }
+                urls.append(url)
+                owners.append(item.id)
+            }
+        }
+        // Text, links and colors have no file to show.
+        guard let start else { NSSound.beep(); return }
+        ShelfQuickLook.shared.show(urls, at: start) { [weak self] index in
+            guard let self else { return }
+            if owners.indices.contains(index), model.items.contains(where: { $0.id == owners[index] }) {
+                model.selectedID = owners[index]
+            }
+            panel?.makeKey()
+        }
+    }
+
+    private func installShelfKeyMonitor() {
+        guard shelfKeyMonitor == nil else { return }
+        shelfKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            MainActor.assumeIsolated { Shelf.shared.handleShelfKey(event) } ? nil : event
+        }
+    }
+
     /// Back to the lower right corner the next time it opens.
     func resetPosition() {
         UserDefaults.standard.removeObject(forKey: Self.positionKey)
@@ -121,6 +209,7 @@ final class Shelf {
 
     private func layout() {
         guard !model.items.isEmpty else {
+            ShelfQuickLook.shared.dismiss()
             panel?.orderOut(nil)
             model.expanded = false
             return
@@ -153,7 +242,7 @@ final class Shelf {
     }
 
     private func makePanel() -> NSPanel {
-        let panel = NSPanel(contentRect: NSRect(origin: .zero, size: Self.collapsedSize),
+        let panel = ShelfPanel(contentRect: NSRect(origin: .zero, size: Self.collapsedSize),
                             styleMask: [.borderless, .nonactivatingPanel],
                             backing: .buffered, defer: false)
         panel.isOpaque = false
@@ -172,7 +261,29 @@ final class Shelf {
                                       forKey: Self.positionKey)
         }
         self.panel = panel
+        installShelfKeyMonitor()
         return panel
+    }
+}
+
+/// Borderless, but able to take the keyboard once an item is clicked; being
+/// non-activating, it does so without bringing Pastely to the front.
+private final class ShelfPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+
+    // Quick Look asks the key window's responder chain who supplies its
+    // files, and drops a data source no responder vouches for.
+    override func acceptsPreviewPanelControl(_ panel: QLPreviewPanel!) -> Bool {
+        MainActor.assumeIsolated { ShelfQuickLook.shared.hasFiles }
+    }
+
+    override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        MainActor.assumeIsolated { ShelfQuickLook.shared.beginControl(panel) }
+    }
+
+    override func endPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        MainActor.assumeIsolated { ShelfQuickLook.shared.endControl(panel) }
     }
 }
 
@@ -180,8 +291,16 @@ final class Shelf {
 @MainActor
 final class ShelfModel {
     private(set) var items: [ClipItem] = []
-    var expanded = false { didSet { if expanded != oldValue { onChange?() } } }
+    var expanded = false {
+        didSet {
+            guard expanded != oldValue else { return }
+            if !expanded { selectedID = nil }
+            onChange?()
+        }
+    }
     var listMode = false
+    /// The item Space shows in Quick Look.
+    var selectedID: UUID?
     @ObservationIgnored var onChange: (() -> Void)?
 
     func add(_ item: ClipItem) {
@@ -194,11 +313,13 @@ final class ShelfModel {
     func remove(_ removed: [ClipItem]) {
         let ids = Set(removed.map(\.id))
         items.removeAll { ids.contains($0.id) }
+        if let selectedID, ids.contains(selectedID) { self.selectedID = nil }
         onChange?()
     }
 
     func clear() {
         items.removeAll()
+        selectedID = nil
         onChange?()
     }
 
@@ -330,19 +451,28 @@ struct ShelfView: View {
 
     @ViewBuilder
     private var expanded: some View {
-        if model.listMode {
-            ScrollView {
-                LazyVStack(spacing: 4) {
-                    ForEach(model.items.reversed()) { item in row(item) }
+        // The arrow keys can move the selection past the edge of the view.
+        ScrollViewReader { proxy in
+            Group {
+                if model.listMode {
+                    ScrollView {
+                        LazyVStack(spacing: 4) {
+                            ForEach(model.items.reversed()) { item in row(item) }
+                        }
+                    }
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        LazyHStack(spacing: 12) {
+                            ForEach(model.items.reversed()) { item in tile(item) }
+                            if !ShelfModel.fileURLs(of: model.items).isEmpty { revealTile }
+                        }
+                        .padding(.horizontal, 2)
+                    }
                 }
             }
-        } else {
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 12) {
-                    ForEach(model.items.reversed()) { item in tile(item) }
-                    if !ShelfModel.fileURLs(of: model.items).isEmpty { revealTile }
-                }
-                .padding(.horizontal, 2)
+            .onChange(of: model.selectedID) { _, id in
+                guard let id else { return }
+                withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo(id) }
             }
         }
     }
@@ -362,8 +492,21 @@ struct ShelfView: View {
         }
         .frame(width: 112)
         .padding(.vertical, 4)
+        .background(selectionBackground(for: item))
         .contentShape(Rectangle())
         .overlay { dragSource(for: item) }
+    }
+
+    /// The selected item gets the bar's blue, lightly, the way Finder marks
+    /// the file Space will show.
+    @ViewBuilder
+    private func selectionBackground(for item: ClipItem) -> some View {
+        if model.selectedID == item.id {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Theme.selection.opacity(0.18))
+                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Theme.selection.opacity(0.55), lineWidth: 1))
+        }
     }
 
     private func row(_ item: ClipItem) -> some View {
@@ -381,6 +524,7 @@ struct ShelfView: View {
         .padding(.horizontal, 10)
         .frame(height: 38)
         .background(Theme.pillSelected, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(selectionBackground(for: item))
         .overlay { dragSource(for: item) }
     }
 
@@ -410,6 +554,7 @@ struct ShelfView: View {
 
     private func dragSource(for item: ClipItem) -> some View {
         ShelfDragSource(items: { [item] },
+                        onClick: { Shelf.shared.select(item) },
                         onDoubleClick: { ShelfActions.open(item) },
                         menu: { menuItems(for: [item]) + [ShelfMenuItem(title: "Remove from Shelf") { model.remove([item]) }] },
                         onDragged: { model.remove($0) })
