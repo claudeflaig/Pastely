@@ -651,6 +651,12 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func showSettings() {
+        #if SUITE
+        if let show = PastelySuite.onShowSettings {
+            show()
+            return
+        }
+        #endif
         NSApp.activate(ignoringOtherApps: true)
         if let win = settingsWindow {
             win.makeKeyAndOrderFront(nil)
