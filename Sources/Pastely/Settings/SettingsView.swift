@@ -107,8 +107,17 @@ struct SettingsView: View {
         .frame(minWidth: 760, minHeight: 560)
     }
 
-    @ViewBuilder
     private var paneContent: some View {
+        SettingsPaneContent(pane: pane)
+    }
+}
+
+/// One pane's rows, without the window's sidebar and header. MacSuite shows
+/// these in its own Settings window.
+struct SettingsPaneContent: View {
+    let pane: SettingsPane
+
+    var body: some View {
         switch pane {
         case .general: GeneralSettings()
         case .appearance: AppearanceSettings()

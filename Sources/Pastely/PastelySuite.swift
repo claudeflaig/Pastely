@@ -1,9 +1,11 @@
 #if SUITE
 import AppKit
+import SwiftUI
 
-/// Entry points for the Pastely suite, which also runs Screeny and Whispy in
-/// this process. Whispy's menu bar icon stands in for Pastely's status item, so
-/// the suite calls the status menu's actions through here.
+/// Entry points for MacSuite, which also runs Screeny and Whispy in this
+/// process. The suite's own menu bar icon stands in for Pastely's status item,
+/// and its one Settings window shows Pastely's panes, so it calls them
+/// through here.
 @MainActor
 public enum PastelySuite {
     public static func makeAppDelegate() -> NSApplicationDelegate { AppController.shared }
@@ -19,5 +21,16 @@ public enum PastelySuite {
     public static func showSettings() { AppController.shared.showSettings() }
     public static func togglePause() { AppController.shared.togglePastelyPause() }
     public static func clearHistory() { ClipboardStore.shared.clearHistory() }
+
+    /// Set by the suite: opens its Settings window on Pastely's panes instead
+    /// of Pastely's own window.
+    public static var onShowSettings: (() -> Void)?
+
+    /// The rows of one Settings pane, by `SettingsPane` raw value, without
+    /// Pastely's sidebar and header.
+    public static func settingsPane(_ id: String) -> AnyView {
+        guard let pane = SettingsPane(rawValue: id) else { return AnyView(EmptyView()) }
+        return AnyView(SettingsPaneContent(pane: pane))
+    }
 }
 #endif
