@@ -38,8 +38,19 @@ struct ClipCardView: View {
                 .strokeBorder(selected ? Theme.selection : Theme.cardBorder,
                               lineWidth: selected ? 1.5 : 1)
         )
-        .shadow(color: .black.opacity(0.10), radius: 10, y: 4)
-        .scaleEffect(hovering && !selected ? 1.015 : 1.0)
+        .overlay {
+            // A faint light edge along the top, as on glass.
+            RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(colors: [.white.opacity(0.22), .white.opacity(0)],
+                                   startPoint: .top, endPoint: .center),
+                    lineWidth: 1)
+                .allowsHitTesting(false)
+        }
+        .shadow(color: Theme.selection.opacity(selected ? 0.45 : 0), radius: 14)
+        .shadow(color: .black.opacity(hovering ? 0.22 : 0.14),
+                radius: hovering ? 16 : 10, y: hovering ? 8 : 4)
+        .scaleEffect(hovering && !selected ? 1.02 : 1.0)
         .zIndex(selected ? 1 : 0)
         .animation(.spring(response: 0.32, dampingFraction: 0.72), value: selected)
         .animation(.easeOut(duration: 0.14), value: hovering)
@@ -54,40 +65,53 @@ struct ClipCardView: View {
         .task(id: item.id) { await loadPreview() }
     }
 
-    /// Paste's header: type and age on the left, and the source app's icon
-    /// oversized at the right edge so the header clips part of it.
+    /// Type and age on the left, the source app's icon on the right, on a
+    /// gradient of the source app's color.
     private var header: some View {
-        ZStack(alignment: .leading) {
-            headerColor
-            VStack(alignment: .leading, spacing: 1) {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(customTitle ?? cardTypeLabel)
-                    .font(.system(size: 16, weight: .medium))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.headerText)
                 HStack(spacing: 6) {
-                    // A renamed card shows its name alone, as Paste does.
+                    // A renamed card shows its name alone.
                     if customTitle == nil {
                         Text(item.createdAt.clipRelativeLong)
-                            .font(.system(size: 12.5, weight: .light))
+                            .font(.system(size: 11.5, weight: .medium))
                             .foregroundStyle(Theme.headerSubText)
                     }
                     if let abbreviation = item.abbreviation {
                         Text(abbreviation)
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
                             .foregroundStyle(Theme.headerText)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 1)
-                            .background(.white.opacity(0.25), in: Capsule())
+                            .background(.white.opacity(0.22), in: Capsule())
                             .help("Type \(abbreviation) anywhere to insert this clip")
                     }
                 }
             }
             .lineLimit(1)
-            .padding(.leading, 14)
-            .padding(.trailing, Theme.appIconSize - 4)
+
+            Spacer(minLength: 4)
+
+            appIconTile
         }
-        .overlay(alignment: .trailing) { appIconTile }
+        .padding(.leading, 14)
+        .padding(.trailing, 12)
         .frame(height: Theme.headerHeight)
-        .clipped()
+        .background(headerBackground)
+    }
+
+    private var headerBackground: some View {
+        ZStack {
+            headerColor
+            LinearGradient(
+                colors: [.white.opacity(0.20), .white.opacity(0), .black.opacity(0.14)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
     }
 
     private var customTitle: String? {
@@ -109,8 +133,7 @@ struct ClipCardView: View {
             .resizable()
             .interpolation(.high)
             .frame(width: Theme.appIconSize, height: Theme.appIconSize)
-            .shadow(color: .black.opacity(0.15), radius: 3, y: 1)
-            .offset(x: 10, y: -4)
+            .shadow(color: .black.opacity(0.22), radius: 4, y: 2)
     }
 
     private var body_: some View {
@@ -127,19 +150,29 @@ struct ClipCardView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay(alignment: .bottom) {
-            // Paste floats an image's size on a dark pill over the picture.
+            // An image's size floats on a frosted pill over the picture.
             if showsImage {
                 Text(metaLeft)
-                    .font(.system(size: 11.5, weight: .regular))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .font(.system(size: 11, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
                     .lineLimit(1)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(.black.opacity(0.45), in: Capsule())
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .environment(\.colorScheme, .dark)
                     .padding(.bottom, 10)
             }
         }
-        .background(Theme.cardBody)
+        .background {
+            // The source color fades into the body, so card and header read
+            // as one piece.
+            ZStack {
+                Theme.cardBody
+                LinearGradient(colors: [headerColor.opacity(0.12), headerColor.opacity(0)],
+                               startPoint: .top, endPoint: .center)
+            }
+        }
     }
 
     private var fillsBody: Bool {
@@ -193,8 +226,8 @@ struct ClipCardView: View {
             // Copied text reads large; longer snippets shrink toward the old
             // body size so they still fit the card.
             Text(item.text ?? "")
-                .font(.system(size: 22, weight: .regular))
-                .lineSpacing(2)
+                .font(.system(size: 20, weight: .medium))
+                .lineSpacing(3)
                 .foregroundStyle(Theme.cardTextPrimary)
                 .lineLimit(10)
                 .minimumScaleFactor(0.6)
@@ -348,8 +381,8 @@ struct ClipCardView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    /// Paste centers a single gray line under the content; a link instead
-    /// gets its title over the address, left aligned.
+    /// One quiet line under the content with a symbol for the kind of clip;
+    /// a link instead gets its title over the address.
     private var footer: some View {
         VStack(alignment: item.type == .link ? .leading : .center, spacing: 2) {
             if item.type == .link {
@@ -369,23 +402,46 @@ struct ClipCardView: View {
             }
             // A path is worth reading in full, so it wraps rather than
             // collapsing to an ellipsis; everything else stays one line.
-            Text(metaLeft)
-                .font(.system(size: 12, weight: .light))
-                .foregroundStyle(Theme.cardTextSecondary)
-                .lineLimit(item.type == .file ? 3 : 1)
-                .multilineTextAlignment(item.type == .link ? .leading : .center)
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                if item.type != .link {
+                    Image(systemName: metaSymbol)
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(Theme.cardTextTertiary)
+                }
+                Text(metaLeft)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(Theme.cardTextSecondary)
+                    .lineLimit(item.type == .file ? 3 : 1)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.trailing, 34)
         }
-        .frame(maxWidth: .infinity, alignment: item.type == .link ? .leading : .center)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(alignment: .bottomTrailing) {
             // The quick-paste shortcut stays out of the way until hovered.
             if index < 9, hovering || selected {
                 Text("\(settings.quickPasteModifierDisplay)\(index + 1)")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Theme.cardTextTertiary)
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(Theme.cardTextSecondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Theme.fieldBG, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    .transition(.opacity)
             }
         }
         .padding(.top, 8)
+    }
+
+    private var metaSymbol: String {
+        switch item.type {
+        case .text: "text.alignleft"
+        case .richText: "textformat"
+        case .file: item.fileURLs.count > 1 ? "doc.on.doc" : "folder"
+        case .image: "photo"
+        case .color: "paintpalette"
+        case .link: "link"
+        }
     }
 
     private var isSingleImageFile: Bool {
