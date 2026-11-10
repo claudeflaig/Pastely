@@ -2,16 +2,15 @@ import AppKit
 import SwiftUI
 
 enum Theme {
-    // Proportions and colors follow Paste: near-square cards with small
-    // corners, a vivid header, a pure white body and dark chrome on a light,
-    // frosted bar.
+    // Near-square cards with soft corners, a vivid gradient header carrying
+    // the source app's icon, and a quiet body.
     static let cardWidth: CGFloat = 290
     static let cardSpacing: CGFloat = 20
     static let cornerRadius: CGFloat = 22
-    static let cardCorner: CGFloat = 12
-    static let headerHeight: CGFloat = 62
+    static let cardCorner: CGFloat = 16
+    static let headerHeight: CGFloat = 58
     static let fileIconSize: CGFloat = 64
-    static let appIconSize: CGFloat = 66
+    static let appIconSize: CGFloat = 34
 
     // Every surface color adapts to the bar's light or dark appearance, the
     // way Paste's two themes do.
@@ -24,7 +23,7 @@ enum Theme {
     static let cardBorder = adaptive(light: NSColor.black.withAlphaComponent(0.06),
                                      dark: NSColor.white.withAlphaComponent(0.08))
     static let selection = Color(red: 0.16, green: 0.50, blue: 0.98)
-    static let selectedCardRing: CGFloat = 4
+    static let selectedCardRing: CGFloat = 3
     // Leave 43 pt beyond the selected-card ring at either strip edge while
     // preserving the ScrollView's normal clipping behavior.
     static let cardStripHorizontalPadding: CGFloat = selectedCardRing + 43
