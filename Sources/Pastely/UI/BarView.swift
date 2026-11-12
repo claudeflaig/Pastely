@@ -11,10 +11,10 @@ struct BarView: View {
         store.barInputMode == .search || !store.searchText.isEmpty || store.filter.isActive
     }
 
-    /// Filters get a row of their own whenever they matter: while searching,
-    /// while one is on, or once the Filter button opened it.
+    /// Filters get a row of their own: opened by the Filter button or by
+    /// starting a search, and put away again by the Filter button.
     private var showsFilterBar: Bool {
-        searchIsActive || store.showsFilterBar
+        store.showsFilterBar
     }
 
     private var searchTextBinding: Binding<String> {

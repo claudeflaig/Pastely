@@ -117,6 +117,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 }
                 if CommandLine.arguments.contains("--demo-filter") {
                     self.store.filter = ClipFilter(kinds: [.text, .link], dateRange: .today)
+                    self.store.showsFilterBar = true
                 }
                 // --demo-snapshot=PATH writes the bar to a PNG and quits, so
                 // the cards can be looked at without a screen recording.
@@ -450,8 +451,8 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         barController?.resignSearch()
         store.searchText = ""
         store.filter = ClipFilter()
-        store.showsFilterBar = false
         store.barInputMode = .cards
+        store.resetFilterBar()
         if hadQuery { store.selectFirst(); searchClearedAt = Date() }
     }
 

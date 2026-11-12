@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// The bar's filters in a row of their own under the tabs: every clip type
-/// as a chip to click, and the source app and date as menus. It shows while
-/// searching, while a filter is on, or after the Filter button is clicked.
+/// as a chip to click, and the source app and date as menus. Searching or
+/// the Filter button opens it; the Filter button puts it away, and the
+/// filters stay on, counted on the button.
 struct FilterBar: View {
     @Bindable private var store = ClipboardStore.shared
 
@@ -193,7 +194,7 @@ struct FilterButton: View {
 
     var body: some View {
         Button {
-            withAnimation(.easeOut(duration: 0.18)) { store.showsFilterBar.toggle() }
+            withAnimation(.easeOut(duration: 0.18)) { store.toggleFilterBar() }
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: "line.3.horizontal.decrease")
