@@ -19,6 +19,7 @@ final class ClipFilterTests: XCTestCase {
         XCTAssertEqual(ClipKind.of(ClipItem(type: .color, colorHex: "#FFFFFF")), .color)
         XCTAssertEqual(ClipKind.of(ClipItem(type: .image, imageFileName: "a.png")), .image)
         XCTAssertEqual(ClipKind.of(file("/tmp/CleanShot 2026-10-14 at 21.00.png")), .screenshot)
+        XCTAssertEqual(ClipKind.of(file("/Users/me/Pictures/Screeny/Screeny_2026-11-12 at 13.02.11.png")), .screenshot)
         XCTAssertEqual(ClipKind.of(file("/tmp/holiday.jpg")), .image)
         XCTAssertEqual(ClipKind.of(file("/tmp/report.pdf")), .file)
     }

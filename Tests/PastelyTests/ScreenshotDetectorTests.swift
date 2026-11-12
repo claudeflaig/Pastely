@@ -6,6 +6,7 @@ final class ScreenshotDetectorTests: XCTestCase {
         XCTAssertTrue(ScreenshotDetector.isScreenshot(URL(fileURLWithPath: "/tmp/CleanShot 2026-10-09 at 21.10.02@2x.png")))
         XCTAssertTrue(ScreenshotDetector.isScreenshot(URL(fileURLWithPath: "/tmp/Bildschirmfoto 2026-10-14 um 21.44.png")))
         XCTAssertTrue(ScreenshotDetector.isScreenshot(URL(fileURLWithPath: "/tmp/Screenshot 2026-10-14 at 9.41.png")))
+        XCTAssertTrue(ScreenshotDetector.isScreenshot(URL(fileURLWithPath: "/tmp/Screeny_2026-11-12 at 13.02.11.png")))
     }
 
     func testCleanShotMediaFolderCountsAsScreenshot() {
