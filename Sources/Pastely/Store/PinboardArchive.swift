@@ -1,12 +1,15 @@
 import AppKit
 
-/// Pinboards as a portable JSON file, for backups and for bringing templates
-/// over from another clipboard manager. Images travel inline as PNG data so
-/// the file stands on its own.
+/// Pinboards as a portable JSON file, for backups, for moving them to another
+/// Mac and for bringing templates over from another clipboard manager.
+/// Images travel inline as PNG data so the file stands on its own; file clips
+/// keep only their paths, since Pastely never copies the files themselves.
 struct PinboardArchive: Codable, Equatable {
     struct Board: Codable, Equatable {
         var name: String
         var colorHex: String?
+        /// The pinboard folder the board sat in; missing in older exports.
+        var folder: String?
         var items: [Item]
     }
 
@@ -28,6 +31,17 @@ struct PinboardArchive: Codable, Equatable {
     var format = "pastely.pinboards"
     var version = 1
     var pinboards: [Board]
+    /// When and on which Mac the file was written; missing in older exports.
+    var exportedAt: Date?
+    var computer: String?
+
+    /// What an import did, for the message shown afterwards.
+    struct ImportResult: Equatable {
+        var clipsAdded = 0
+        var clipsSkipped = 0
+        var boardsCreated = 0
+        var boardsMerged = 0
+    }
 
     static func decode(_ data: Data) throws -> PinboardArchive {
         let archive = try JSONDecoder().decode(PinboardArchive.self, from: data)
@@ -70,6 +84,7 @@ extension ClipboardStore {
             PinboardArchive.Board(
                 name: board.name,
                 colorHex: board.colorHex,
+                folder: group(of: board)?.name,
                 items: board.items.map { item in
                     var png: Data?
                     if item.type == .image, let url = imageURL(for: item) {
@@ -88,30 +103,43 @@ extension ClipboardStore {
                                                 createdAt: item.createdAt,
                                                 abbreviation: item.abbreviation)
                 })
-        })
+        },
+        exportedAt: Date(),
+        computer: Host.current().localizedName)
     }
 
-    /// Adds the archive's boards, merging into boards of the same name and
-    /// skipping clips a board already holds. Returns how many clips were added.
+    /// Adds the archive's boards without touching what is already here:
+    /// a board merges into the board of the same name, a clip that board
+    /// already holds is skipped, so importing the same file twice adds
+    /// nothing. New boards go back into their folder, created if needed.
     @discardableResult
-    func importPinboards(_ archive: PinboardArchive) -> Int {
-        var added = 0
+    func importPinboards(_ archive: PinboardArchive) -> PinboardArchive.ImportResult {
+        var result = PinboardArchive.ImportResult()
         for board in archive.pinboards {
-            let id = pinboards.first { $0.name.caseInsensitiveCompare(board.name) == .orderedSame }?.id
-                ?? addPinboard(name: board.name, colorHex: board.colorHex).id
-            // Inserted newest-first by saveToPinboard, so walk backwards to
-            // keep the archive's order.
-            for archived in board.items.reversed() {
-                guard var (clip, image) = PinboardArchive.clip(from: archived) else { continue }
-                if let image {
-                    guard let name = storeImageData(image) else { continue }
-                    clip.imageFileName = name
+            let id: UUID
+            if let existing = pinboards.first(where: { $0.name.caseInsensitiveCompare(board.name) == .orderedSame }) {
+                id = existing.id
+                result.boardsMerged += 1
+            } else {
+                id = addPinboard(name: board.name, colorHex: board.colorHex).id
+                result.boardsCreated += 1
+                if let folder = board.folder?.trimmingCharacters(in: .whitespaces), !folder.isEmpty {
+                    let group = groups.first { $0.name.caseInsensitiveCompare(folder) == .orderedSame }
+                        ?? addGroup(name: folder)
+                    movePinboard(id, into: group.id)
                 }
-                let before = pinboards.first { $0.id == id }?.items.count ?? 0
-                saveToPinboard(clip, boardID: id)
-                if (pinboards.first { $0.id == id }?.items.count ?? 0) > before { added += 1 }
+            }
+            // Each clip goes in front, so walk backwards to keep the
+            // archive's order.
+            for archived in board.items.reversed() {
+                guard let (clip, image) = PinboardArchive.clip(from: archived) else { continue }
+                if insertImportedClip(clip, imageData: image, into: id) {
+                    result.clipsAdded += 1
+                } else {
+                    result.clipsSkipped += 1
+                }
             }
         }
-        return added
+        return result
     }
 }

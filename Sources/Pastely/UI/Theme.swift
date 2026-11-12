@@ -7,10 +7,10 @@ enum Theme {
     static let cardWidth: CGFloat = 290
     static let cardSpacing: CGFloat = 20
     static let cornerRadius: CGFloat = 22
-    static let cardCorner: CGFloat = 16
-    static let headerHeight: CGFloat = 58
+    static let cardCorner: CGFloat = 18
+    static let headerHeight: CGFloat = 56
     static let fileIconSize: CGFloat = 64
-    static let appIconSize: CGFloat = 34
+    static let appIconSize: CGFloat = 30
 
     // Every surface color adapts to the bar's light or dark appearance, the
     // way Paste's two themes do.
@@ -19,14 +19,45 @@ enum Theme {
     static let glassTint = NSColor(name: nil) { appearance in
         isDark(appearance) ? NSColor(white: 0.08, alpha: 0.32) : NSColor.white.withAlphaComponent(0.42)
     }
-    static let cardBody = adaptive(light: .white, dark: NSColor(white: 0.17, alpha: 1))
+    static let cardBody = adaptive(light: NSColor(srgbRed: 0.995, green: 0.993, blue: 0.99, alpha: 1),
+                                   dark: NSColor(srgbRed: 0.155, green: 0.152, blue: 0.15, alpha: 1))
     static let cardBorder = adaptive(light: NSColor.black.withAlphaComponent(0.06),
                                      dark: NSColor.white.withAlphaComponent(0.08))
+    /// The hairline around a card: a little stronger on light glass, where a
+    /// white card would otherwise dissolve into the bar.
+    static let cardHairline = adaptive(light: NSColor.black.withAlphaComponent(0.09),
+                                       dark: NSColor.white.withAlphaComponent(0.10))
+    /// The light catching a card's top edge, as on glass.
+    static let cardSheen = adaptive(light: NSColor.white.withAlphaComponent(0.70),
+                                    dark: NSColor.white.withAlphaComponent(0.22))
+    static let cardShadow = adaptive(light: NSColor.black.withAlphaComponent(0.10),
+                                     dark: NSColor.black.withAlphaComponent(0.34))
+
+    /// The Glass theme's card: barely there, so the bar shows through.
+    static let glassCard = adaptive(light: NSColor.white.withAlphaComponent(0.62),
+                                    dark: NSColor.white.withAlphaComponent(0.07))
+    /// The Paper theme's card: warm off-white, or warm ink in the dark.
+    static let paper = adaptive(light: NSColor(srgbRed: 0.988, green: 0.976, blue: 0.953, alpha: 1),
+                                dark: NSColor(srgbRed: 0.137, green: 0.129, blue: 0.122, alpha: 1))
+    static let paperSpine: CGFloat = 4
+
     static let selection = Color(red: 0.16, green: 0.50, blue: 0.98)
-    static let selectedCardRing: CGFloat = 3
+    /// The selected card gets a focus ring that stands slightly off the card,
+    /// with a soft glow around it.
+    static let selectedCardRing: CGFloat = 2.5
+    static let selectionRingGap: CGFloat = 3
+    static let selectionGlowRadius: CGFloat = 10
+    /// How far a hovered card lifts.
+    static let cardHoverLift: CGFloat = 3
+    /// How far the selection reaches past the card: ring, gap and glow.
+    static let selectionOutset: CGFloat = selectedCardRing + selectionRingGap + selectionGlowRadius
     // Leave 43 pt beyond the selected-card ring at either strip edge while
     // preserving the ScrollView's normal clipping behavior.
-    static let cardStripHorizontalPadding: CGFloat = selectedCardRing + 43
+    static let cardStripHorizontalPadding: CGFloat = selectedCardRing + selectionRingGap + 43
+    /// The strip clips its content, so it leaves room above and below the
+    /// cards for the whole selection glow and a hovered card's lift.
+    static let cardStripTopPadding: CGFloat = selectionOutset + cardHoverLift + 4
+    static let cardStripBottomPadding: CGFloat = max(26, selectionOutset + 8)
 
     static let chromeTextPrimary = graphite(0.88)
     static let chromeTextSecondary = graphite(0.55)

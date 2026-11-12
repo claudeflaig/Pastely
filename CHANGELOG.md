@@ -13,6 +13,26 @@ All notable changes to Pesty are documented here. The format is based on
   recognized on device and copied, so it also lands in the history. The
   shortcut can be changed or turned off in Settings → Shortcuts, and the menu
   bar icon has a Capture Text entry.
+- Moving pinboards to another Mac: Export Pinboards… and Import Pinboards…
+  in the bar's "…" menu and in Settings → History write every pinboard, its
+  folder and its clips (images included) to one file and merge it back in.
+  Existing pinboards are kept, boards of the same name are merged, and
+  importing the same file again adds nothing.
+
+- Card styles in Settings → Appearance: Classic, Glass (see-through cards lit
+  from the corner by the source app's color) and Paper (warm paper with a
+  colored spine, small caps and a serif face for text).
+
+### Changed
+- Calmer, more refined cards: softer header gradients with a hairline and a
+  glassy top edge, layered shadows, a hovered card lifts, and the selected
+  card gets a focus ring standing off the card with a soft glow.
+
+### Fixed
+- The selected card's glow is no longer cut off at the top of the strip: the
+  strip no longer clips it and leaves room for it.
+- Re-importing a pinboard export no longer duplicates its images or leaves
+  stray image files behind.
 
 ## [1.3.0] - 2026-10-08
 

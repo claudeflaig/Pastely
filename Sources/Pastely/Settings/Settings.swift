@@ -138,6 +138,34 @@ enum HistoryRetentionPreset: Int, CaseIterable, Identifiable {
     }
 }
 
+/// How the clip cards are drawn. The colors still come from `ClipColorTheme`.
+enum CardTheme: Int, CaseIterable, Identifiable {
+    /// A colored header with the source app's icon over a quiet body.
+    case classic
+    /// Translucent cards lit from the corner by the source app's color.
+    case glass
+    /// Warm paper with a colored spine, small caps and a serif face.
+    case paper
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .classic: "Classic"
+        case .glass: "Glass"
+        case .paper: "Paper"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .classic: "A colored header with the app\u{2019}s icon over a quiet card."
+        case .glass: "See-through cards, lit from the corner by the app\u{2019}s color."
+        case .paper: "Calm paper cards with a colored edge and a serif face for text."
+        }
+    }
+}
+
 enum ClipColorTheme: Int, CaseIterable, Identifiable {
     case `default`
     case vibrant
@@ -304,6 +332,7 @@ final class Settings {
         static let iCloudSync = "iCloudSync"
         static let cloudKitSync = "cloudKitSync"
         static let clipColorTheme = "clipColorTheme"
+        static let cardTheme = "cardTheme"
         static let clipColorAccentHex = "clipColorAccentHex"
         static let selectedClipPosition = "selectedClipPosition"
         static let barAppearance = "barAppearance"
@@ -532,6 +561,10 @@ final class Settings {
         didSet { guard isLoaded else { return }; d.set(clipColorTheme.rawValue, forKey: Keys.clipColorTheme) }
     }
 
+    var cardTheme: CardTheme {
+        didSet { guard isLoaded else { return }; d.set(cardTheme.rawValue, forKey: Keys.cardTheme) }
+    }
+
     var clipColorAccentHex: String {
         didSet { guard isLoaded else { return }; d.set(clipColorAccentHex, forKey: Keys.clipColorAccentHex) }
     }
@@ -710,6 +743,7 @@ final class Settings {
             Keys.iCloudSync: false,
             Keys.cloudKitSync: true,
             Keys.clipColorTheme: ClipColorTheme.appIcon.rawValue,
+            Keys.cardTheme: CardTheme.classic.rawValue,
             Keys.clipColorAccentHex: "#FF5A9F",
             Keys.selectedClipPosition: SelectedClipPosition.center.rawValue,
             Keys.barAppearance: BarAppearance.system.rawValue,
@@ -768,6 +802,7 @@ final class Settings {
         iCloudSync = d.bool(forKey: Keys.iCloudSync)
         cloudKitSync = d.bool(forKey: Keys.cloudKitSync)
         clipColorTheme = ClipColorTheme(rawValue: d.integer(forKey: Keys.clipColorTheme)) ?? .default
+        cardTheme = CardTheme(rawValue: d.integer(forKey: Keys.cardTheme)) ?? .classic
         clipColorAccentHex = d.string(forKey: Keys.clipColorAccentHex) ?? "#FF5A9F"
         selectedClipPosition = SelectedClipPosition(rawValue: d.integer(forKey: Keys.selectedClipPosition)) ?? .center
         barAppearance = BarAppearance(rawValue: d.integer(forKey: Keys.barAppearance)) ?? .system

@@ -101,14 +101,20 @@ final class ClipboardStore {
     /// Settings can report how much space history actually uses.
     var dataDirectory: URL { baseDir }
 
-    private init() {
+    private convenience init() {
         let base = (Settings.shared.iCloudSync ? ClipboardStore.iCloudBase : nil) ?? ClipboardStore.localBase
+        self.init(baseDirectory: base)
+        if Settings.shared.iCloudSync { startWatching() }
+    }
+
+    /// A store kept in a folder of its own; tests use it so they never
+    /// touch the real history.
+    init(baseDirectory base: URL) {
         baseDir = base
         imagesDir = base.appendingPathComponent("images", isDirectory: true)
         storeURL = base.appendingPathComponent("store.json")
         prepareDirectories()
         load()
-        if Settings.shared.iCloudSync { startWatching() }
     }
 
     private func prepareDirectories() {
@@ -598,6 +604,39 @@ final class ClipboardStore {
         if pinboards[i].items.contains(where: { $0.sameContent(as: item) }) { return }
         pinboards[i].items.insert(independentCopy(of: item, createdAt: item.createdAt), at: 0)
         scheduleSave()
+    }
+
+    /// Puts an imported clip in front of a pinboard unless the board already
+    /// holds the same content. An image is written to a file of its own only
+    /// once it is known to be new, so a repeated import leaves nothing behind.
+    @discardableResult
+    func insertImportedClip(_ item: ClipItem, imageData: Data?, into boardID: UUID) -> Bool {
+        guard let i = pinboards.firstIndex(where: { $0.id == boardID }) else { return false }
+        var item = item
+        if let imageData {
+            item.type = .image
+            item.imageHash = ClipboardMonitor.sha256Hex(imageData)
+        } else if item.type == .image {
+            return false
+        }
+        if pinboards[i].items.contains(where: { sameImportedContent($0, item) }) { return false }
+        if let imageData {
+            guard let name = storeImageData(imageData) else { return false }
+            item.imageFileName = name
+        }
+        pinboards[i].items.insert(item, at: 0)
+        scheduleSave()
+        return true
+    }
+
+    /// Like `sameContent`, but an older image clip without a stored hash is
+    /// compared by its file's contents.
+    private func sameImportedContent(_ existing: ClipItem, _ new: ClipItem) -> Bool {
+        if existing.type == .image, new.type == .image, existing.imageHash == nil, let hash = new.imageHash {
+            guard let url = imageURL(for: existing), let data = try? Data(contentsOf: url) else { return false }
+            return ClipboardMonitor.sha256Hex(data) == hash
+        }
+        return existing.sameContent(as: new)
     }
 
     /// A copy with its own UUID and its own image file, so no two containers

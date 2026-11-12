@@ -15,6 +15,7 @@ struct ClipCardView: View {
     private var store: ClipboardStore { ClipboardStore.shared }
     private var settings: Settings { Settings.shared }
     private var headerColor: Color { SourceColor.color(for: item.sourceBundleID) }
+    private var theme: CardTheme { settings.cardTheme }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -22,38 +23,35 @@ struct ClipCardView: View {
             body_
         }
         .frame(width: Theme.cardWidth)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous))
-        .background {
-            if selected {
-                RoundedRectangle(
-                    cornerRadius: Theme.cardCorner + Theme.selectedCardRing,
-                    style: .continuous
-                )
-                .fill(Theme.selection)
-                .padding(-Theme.selectedCardRing)
-            }
-        }
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous)
-                .strokeBorder(selected ? Theme.selection : Theme.cardBorder,
-                              lineWidth: selected ? 1.5 : 1)
-        )
+        .background { cardBackground }
+        .clipShape(cardShape)
+        // A hairline holds the card's edge on any background; above it, a
+        // thin sheen catches the light along the top, as on glass.
         .overlay {
-            // A faint light edge along the top, as on glass.
-            RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(colors: [.white.opacity(0.22), .white.opacity(0)],
-                                   startPoint: .top, endPoint: .center),
-                    lineWidth: 1)
+            cardShape.strokeBorder(Theme.cardHairline, lineWidth: 0.5)
                 .allowsHitTesting(false)
         }
-        .shadow(color: Theme.selection.opacity(selected ? 0.45 : 0), radius: 14)
-        .shadow(color: .black.opacity(hovering ? 0.22 : 0.14),
-                radius: hovering ? 16 : 10, y: hovering ? 8 : 4)
-        .scaleEffect(hovering && !selected ? 1.02 : 1.0)
+        .overlay {
+            cardShape.strokeBorder(
+                LinearGradient(stops: [.init(color: Theme.cardSheen, location: 0),
+                                       .init(color: .clear, location: 0.28),
+                                       .init(color: .clear, location: 0.85),
+                                       .init(color: .white.opacity(0.05), location: 1)],
+                               startPoint: .top, endPoint: .bottom),
+                lineWidth: 1)
+                .blendMode(.plusLighter)
+                .allowsHitTesting(false)
+        }
+        // A close contact shadow and a wide soft one, so the card rests on
+        // the bar rather than floating over it; a hovered card lifts.
+        .shadow(color: Theme.cardShadow, radius: 1.5, y: 1)
+        .shadow(color: Theme.cardShadow.opacity(hovering ? 1.6 : 1),
+                radius: hovering ? 16 : 11, y: hovering ? 9 : 5)
+        .background { if selected { selectionRing } }
+        .offset(y: hovering && !selected ? -Theme.cardHoverLift : 0)
         .zIndex(selected ? 1 : 0)
-        .animation(.spring(response: 0.32, dampingFraction: 0.72), value: selected)
-        .animation(.easeOut(duration: 0.14), value: hovering)
+        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: selected)
+        .animation(.spring(response: 0.26, dampingFraction: 0.8), value: hovering)
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture(count: 2) { AppController.shared.pasteItem(item) }
@@ -65,19 +63,149 @@ struct ClipCardView: View {
         .task(id: item.id) { await loadPreview() }
     }
 
+    private var cardShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous)
+    }
+
+    /// A focus ring standing a few points off the card, with a soft glow.
+    /// The strip leaves room for all of it (`Theme.selectionOutset`).
+    private var selectionRing: some View {
+        let outset = Theme.selectionRingGap + Theme.selectedCardRing
+        return RoundedRectangle(cornerRadius: Theme.cardCorner + outset, style: .continuous)
+            .strokeBorder(Theme.selection, lineWidth: Theme.selectedCardRing)
+            .padding(-outset)
+            .shadow(color: Theme.selection.opacity(0.7), radius: Theme.selectionGlowRadius * 0.4)
+            .shadow(color: Theme.selection.opacity(0.45), radius: Theme.selectionGlowRadius)
+            .transition(.opacity.combined(with: .scale(scale: 0.98)))
+            .allowsHitTesting(false)
+    }
+
+    @ViewBuilder
+    private var header: some View {
+        switch theme {
+        case .classic: classicHeader
+        case .glass: glassHeader
+        case .paper: paperHeader
+        }
+    }
+
+    /// Behind the whole card, for the themes without a colored header.
+    @ViewBuilder
+    private var cardBackground: some View {
+        switch theme {
+        case .classic:
+            EmptyView()
+        case .glass:
+            // Clear glass, lit from the top left by the source color, with a
+            // faint echo of it in the opposite corner.
+            ZStack {
+                Theme.glassCard
+                RadialGradient(colors: [headerColor.opacity(0.46), headerColor.opacity(0)],
+                               center: UnitPoint(x: 0, y: 0), startRadius: 0,
+                               endRadius: Theme.cardWidth * 0.95)
+                RadialGradient(colors: [headerColor.opacity(0.16), headerColor.opacity(0)],
+                               center: UnitPoint(x: 1, y: 1), startRadius: 0,
+                               endRadius: Theme.cardWidth * 0.7)
+                LinearGradient(colors: [.white.opacity(0.10), .white.opacity(0)],
+                               startPoint: .top, endPoint: .center)
+            }
+        case .paper:
+            ZStack(alignment: .leading) {
+                Theme.paper
+                // The colored spine, like the edge of an index card.
+                LinearGradient(colors: [headerColor, headerColor.opacity(0.75)],
+                               startPoint: .top, endPoint: .bottom)
+                    .frame(width: Theme.paperSpine)
+            }
+        }
+    }
+
+    /// The source app's small icon and the card's name and age on clear
+    /// glass, with a dot of the source color glowing on the right.
+    private var glassHeader: some View {
+        HStack(spacing: 9) {
+            appIcon(size: 24)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(customTitle ?? cardTypeLabel)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.cardTextPrimary)
+                if customTitle == nil {
+                    Text(item.createdAt.clipRelativeLong)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.cardTextSecondary)
+                }
+            }
+            .lineLimit(1)
+            Spacer(minLength: 4)
+            abbreviationChip
+            Circle()
+                .fill(headerColor)
+                .frame(width: 7, height: 7)
+                .shadow(color: headerColor.opacity(0.9), radius: 4)
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 12)
+        .padding(.bottom, 2)
+    }
+
+    /// Small caps for the kind of clip and a short age, set like a label on
+    /// an index card.
+    private var paperHeader: some View {
+        HStack(alignment: .center, spacing: 7) {
+            appIcon(size: 16)
+            Text((customTitle ?? cardTypeLabel).uppercased())
+                .font(.system(size: 10.5, weight: .semibold))
+                .tracking(1.2)
+                .foregroundStyle(Theme.cardTextSecondary)
+                .lineLimit(1)
+            Spacer(minLength: 4)
+            abbreviationChip
+            Text(item.createdAt.clipRelative)
+                .font(.system(size: 10.5, weight: .medium))
+                .monospacedDigit()
+                .foregroundStyle(Theme.cardTextTertiary)
+        }
+        .padding(.leading, Theme.paperSpine + 14)
+        .padding(.trailing, 14)
+        .padding(.top, 13)
+        .padding(.bottom, 2)
+    }
+
+    @ViewBuilder
+    private var abbreviationChip: some View {
+        if let abbreviation = item.abbreviation {
+            Text(abbreviation)
+                .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                .foregroundStyle(Theme.cardTextSecondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 1.5)
+                .background(Theme.fieldBG, in: Capsule())
+                .help("Type \(abbreviation) anywhere to insert this clip")
+        }
+    }
+
+    private func appIcon(size: CGFloat) -> some View {
+        Image(nsImage: AppIconProvider.icon(forBundleID: item.sourceBundleID))
+            .resizable()
+            .interpolation(.high)
+            .frame(width: size, height: size)
+            .shadow(color: .black.opacity(0.18), radius: 1.5, y: 0.5)
+    }
+
     /// Type and age on the left, the source app's icon on the right, on a
     /// gradient of the source app's color.
-    private var header: some View {
+    private var classicHeader: some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(customTitle ?? cardTypeLabel)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 14.5, weight: .semibold))
+                    .tracking(-0.1)
                     .foregroundStyle(Theme.headerText)
                 HStack(spacing: 6) {
                     // A renamed card shows its name alone.
                     if customTitle == nil {
                         Text(item.createdAt.clipRelativeLong)
-                            .font(.system(size: 11.5, weight: .medium))
+                            .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(Theme.headerSubText)
                     }
                     if let abbreviation = item.abbreviation {
@@ -92,25 +220,36 @@ struct ClipCardView: View {
                 }
             }
             .lineLimit(1)
+            // Keeps white type readable on light colors such as yellow.
+            .shadow(color: .black.opacity(0.18), radius: 1.5, y: 0.5)
 
             Spacer(minLength: 4)
 
             appIconTile
         }
-        .padding(.leading, 14)
-        .padding(.trailing, 12)
+        .padding(.leading, 15)
+        .padding(.trailing, 13)
         .frame(height: Theme.headerHeight)
         .background(headerBackground)
     }
 
+    /// The source color, lit from the top left and settling darker toward
+    /// the body, with a hairline where header and body meet.
     private var headerBackground: some View {
         ZStack {
             headerColor
             LinearGradient(
-                colors: [.white.opacity(0.20), .white.opacity(0), .black.opacity(0.14)],
+                colors: [.white.opacity(0.16), .white.opacity(0), .black.opacity(0.16)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
+            RadialGradient(colors: [.white.opacity(0.12), .white.opacity(0)],
+                           center: UnitPoint(x: 0.1, y: -0.3),
+                           startRadius: 0, endRadius: Theme.cardWidth * 0.6)
+        }
+        .saturation(0.95)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(.black.opacity(0.12)).frame(height: 0.5)
         }
     }
 
@@ -133,18 +272,37 @@ struct ClipCardView: View {
             .resizable()
             .interpolation(.high)
             .frame(width: Theme.appIconSize, height: Theme.appIconSize)
-            .shadow(color: .black.opacity(0.22), radius: 4, y: 2)
+            .shadow(color: .black.opacity(0.25), radius: 3, y: 1.5)
     }
 
     private var body_: some View {
         VStack(alignment: .leading, spacing: 0) {
-            content
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(.horizontal, fillsBody ? 0 : 16)
-                .padding(.top, fillsBody ? 0 : 14)
+            if fillsBody && insetsMedia {
+                // Glass and Paper set pictures and colors in like a print.
+                content
+                    .clipShape(RoundedRectangle(cornerRadius: mediaCorner, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: mediaCorner, style: .continuous)
+                        .strokeBorder(Theme.cardBorder, lineWidth: 0.5))
+                    .padding(.leading, contentLeading - 6)
+                    .padding(.trailing, 10)
+                    .padding(.top, 8)
+                    .padding(.bottom, 10)
+            } else {
+                content
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.leading, fillsBody ? 0 : contentLeading)
+                    .padding(.trailing, fillsBody ? 0 : 16)
+                    .padding(.top, fillsBody ? 0 : (theme == .classic ? 14 : 10))
+            }
             if !showsImage && item.type != .color {
+                if theme == .paper {
+                    Rectangle().fill(Theme.cardBorder).frame(height: 0.5)
+                        .padding(.leading, contentLeading)
+                        .padding(.trailing, 16)
+                }
                 footer
-                    .padding(.horizontal, 16)
+                    .padding(.leading, contentLeading)
+                    .padding(.trailing, 16)
                     .padding(.bottom, 12)
             }
         }
@@ -160,20 +318,31 @@ struct ClipCardView: View {
                     .padding(.horizontal, 9)
                     .padding(.vertical, 4)
                     .background(.ultraThinMaterial, in: Capsule())
+                    .overlay(Capsule().strokeBorder(.white.opacity(0.18), lineWidth: 0.5))
                     .environment(\.colorScheme, .dark)
-                    .padding(.bottom, 10)
+                    .shadow(color: .black.opacity(0.2), radius: 4, y: 1)
+                    .padding(.bottom, insetsMedia ? 20 : 12)
             }
         }
         .background {
             // The source color fades into the body, so card and header read
             // as one piece.
-            ZStack {
-                Theme.cardBody
-                LinearGradient(colors: [headerColor.opacity(0.12), headerColor.opacity(0)],
-                               startPoint: .top, endPoint: .center)
+            if theme == .classic {
+                ZStack {
+                    Theme.cardBody
+                    LinearGradient(colors: [headerColor.opacity(0.10), headerColor.opacity(0.03), headerColor.opacity(0)],
+                                   startPoint: .top, endPoint: .bottom)
+                }
             }
         }
     }
+
+    private var insetsMedia: Bool { theme != .classic }
+
+    private var mediaCorner: CGFloat { theme == .glass ? 12 : 5 }
+
+    /// Paper leaves room for its colored spine.
+    private var contentLeading: CGFloat { theme == .paper ? Theme.paperSpine + 14 : 16 }
 
     private var fillsBody: Bool {
         showsImage || item.type == .color
@@ -226,7 +395,9 @@ struct ClipCardView: View {
             // Copied text reads large; longer snippets shrink toward the old
             // body size so they still fit the card.
             Text(item.text ?? "")
-                .font(.system(size: 20, weight: .medium))
+                .font(theme == .paper ? .system(size: 18, weight: .regular, design: .serif)
+                                      : .system(size: 19, weight: .medium))
+                .tracking(theme == .paper ? 0 : -0.2)
                 .lineSpacing(3)
                 .foregroundStyle(Theme.cardTextPrimary)
                 .lineLimit(10)
@@ -410,6 +581,7 @@ struct ClipCardView: View {
                 }
                 Text(metaLeft)
                     .font(.system(size: 11.5, weight: .medium))
+                    .monospacedDigit()
                     .foregroundStyle(Theme.cardTextSecondary)
                     .lineLimit(item.type == .file ? 3 : 1)
                     .multilineTextAlignment(.leading)
@@ -422,11 +594,12 @@ struct ClipCardView: View {
             // The quick-paste shortcut stays out of the way until hovered.
             if index < 9, hovering || selected {
                 Text("\(settings.quickPasteModifierDisplay)\(index + 1)")
-                    .font(.system(size: 10.5, weight: .semibold))
+                    .font(.system(size: 10.5, weight: .semibold, design: .rounded))
                     .foregroundStyle(Theme.cardTextSecondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Theme.fieldBG, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2.5)
+                    .background(Theme.fieldBG, in: Capsule())
+                    .overlay(Capsule().strokeBorder(Theme.cardBorder, lineWidth: 0.5))
                     .transition(.opacity)
             }
         }

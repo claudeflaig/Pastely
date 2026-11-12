@@ -163,7 +163,7 @@ extension PastyImporter {
             // an earlier copy is still good to import from.
         }
         let archive = try archive(fromDatabase: database)
-        let clips = ClipboardStore.shared.importPinboards(archive)
+        let clips = ClipboardStore.shared.importPinboards(archive).clipsAdded
         // The copy holds Pasty's whole history; nothing needs it any more.
         try? FileManager.default.removeItem(at: importFolder)
         return (archive.pinboards.count, clips)
