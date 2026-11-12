@@ -33,6 +33,8 @@ All notable changes to Pesty are documented here. The format is based on
   card gets a focus ring standing off the card with a soft glow.
 
 ### Fixed
+- Screeny's captures (Screeny_…), and Shottr's and Xnapper's, count as
+  screenshots in the Screenshot filter and on their cards.
 - The selected card's glow is no longer cut off at the top of the strip: the
   strip no longer clips it and leaves room for it.
 - Re-importing a pinboard export no longer duplicates its images or leaves

@@ -3,11 +3,12 @@ import CryptoKit
 import Observation
 
 /// Tells a screenshot apart from any other picture by its file name, which is
-/// all a copied file carries: macOS, CleanShot and the common capture tools
-/// name their files consistently.
+/// all a copied file carries: macOS, CleanShot, Screeny and the common
+/// capture tools name their files consistently.
 enum ScreenshotDetector {
     private static let prefixes = ["cleanshot", "screenshot", "bildschirmfoto", "screen shot",
-                                   "capture d’écran", "captura de pantalla", "schermata"]
+                                   "capture d’écran", "captura de pantalla", "schermata",
+                                   "screeny_", "shottr", "xnapper"]
 
     static func isScreenshot(_ url: URL) -> Bool {
         if url.path.contains("/CleanShot/media/") { return true }
