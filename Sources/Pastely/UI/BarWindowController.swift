@@ -295,4 +295,12 @@ final class BarWindowController: NSWindowController, NSWindowDelegate {
               !AppController.shared.suppressAutoHide else { return }
         AppController.shared.hideBar()
     }
+
+    /// The bar's current contents as a PNG, for `--demo-snapshot`.
+    func writeSnapshot(to url: URL) {
+        guard let view = window?.contentView,
+              let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
+        view.cacheDisplay(in: view.bounds, to: rep)
+        try? rep.representation(using: .png, properties: [:])?.write(to: url)
+    }
 }

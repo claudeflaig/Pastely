@@ -290,6 +290,74 @@ private struct ChoiceTile<Preview: View>: View {
     }
 }
 
+/// Two small cards in a card style, for the Card Style tiles.
+private struct CardMiniature: View {
+    var theme: CardTheme
+    @Environment(\.colorScheme) private var scheme
+
+    private let colors: [Color] = [Color(red: 0.98, green: 0.71, blue: 0.04), Color(red: 0.21, green: 0.55, blue: 0.98)]
+
+    var body: some View {
+        ZStack {
+            (scheme == .dark ? Color(white: 0.13) : Color(white: 0.9))
+            HStack(spacing: 8) {
+                ForEach(colors.indices, id: \.self) { card(colors[$0]) }
+            }
+        }
+    }
+
+    private func card(_ color: Color) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
+        let lines = VStack(alignment: .leading, spacing: 3) {
+            ForEach([1.0, 0.8, 0.55], id: \.self) { width in
+                Capsule().fill(Color.primary.opacity(0.28))
+                    .frame(width: 30 * width, height: 2.5)
+            }
+        }
+        return VStack(alignment: .leading, spacing: 0) {
+            switch theme {
+            case .classic:
+                LinearGradient(colors: [color.opacity(0.85), color], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    .frame(height: 14)
+                lines.padding(6)
+            case .glass:
+                HStack(spacing: 3) {
+                    RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 7, height: 7)
+                    Capsule().fill(Color.primary.opacity(0.35)).frame(width: 16, height: 2.5)
+                }
+                .padding([.top, .leading], 6)
+                lines.padding(6)
+            case .paper:
+                Capsule().fill(Color.primary.opacity(0.25)).frame(width: 18, height: 2)
+                    .padding(.top, 7).padding(.leading, 8)
+                lines.padding(.leading, 8).padding(.top, 5)
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(width: 44, height: 52, alignment: .topLeading)
+        .background {
+            switch theme {
+            case .classic:
+                Theme.cardBody
+            case .glass:
+                ZStack {
+                    Theme.glassCard
+                    RadialGradient(colors: [color.opacity(0.55), color.opacity(0)],
+                                   center: .topLeading, startRadius: 0, endRadius: 50)
+                }
+            case .paper:
+                ZStack(alignment: .leading) {
+                    Theme.paper
+                    color.frame(width: 2.5)
+                }
+            }
+        }
+        .clipShape(shape)
+        .overlay(shape.strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
+    }
+}
+
 /// A miniature desktop with the card bar on it, for the theme and position
 /// tiles.
 private struct BarMiniature: View {
@@ -446,6 +514,19 @@ private struct AppearanceSettings: View {
                             settings.barAppearance = appearance
                         } preview: {
                             BarMiniature(dark: appearance == .dark, split: appearance == .system)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+
+            SettingsCard(title: "Card Style", footer: settings.cardTheme.detail) {
+                HStack(spacing: 14) {
+                    ForEach(CardTheme.allCases) { theme in
+                        ChoiceTile(title: theme.title, selected: settings.cardTheme == theme) {
+                            settings.cardTheme = theme
+                        } preview: {
+                            CardMiniature(theme: theme)
                         }
                     }
                 }
@@ -822,16 +903,7 @@ private struct HistorySettings: View {
     @State private var importMessage: String?
 
     private func exportPinboards() {
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = "Pastely Pinboards.json"
-        panel.allowedContentTypes = [.json]
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            try ClipboardStore.shared.pinboardArchive().encoded().write(to: url, options: .atomic)
-            importMessage = "Exported \(ClipboardStore.shared.pinboards.count) pinboards."
-        } catch {
-            importMessage = "Export failed: \(error.localizedDescription)"
-        }
+        if let message = PinboardTransfer.export() { importMessage = message }
     }
 
     private func importFromPasty() {
@@ -844,17 +916,7 @@ private struct HistorySettings: View {
     }
 
     private func importPinboards() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.json]
-        panel.allowsMultipleSelection = false
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let archive = try PinboardArchive.decode(Data(contentsOf: url))
-            let added = ClipboardStore.shared.importPinboards(archive)
-            importMessage = "Imported \(added) clips into \(archive.pinboards.count) pinboards."
-        } catch {
-            importMessage = "This file is not a Pastely pinboard export."
-        }
+        if let message = PinboardTransfer.importFile() { importMessage = message }
     }
 
     var body: some View {
@@ -867,11 +929,11 @@ private struct HistorySettings: View {
                 .padding(.vertical, -10)
 
             SettingsCard(title: "Pinboards",
-                         footer: importMessage ?? "Save your pinboards as a file for safekeeping, or bring templates in from one.") {
-                SettingsRow(title: "Export pinboards", detail: "Writes every pinboard and its clips to a JSON file.") {
+                         footer: importMessage ?? "To bring your pinboards to another Mac, export them here and import the file there. Importing again adds nothing twice.") {
+                SettingsRow(title: "Export pinboards", detail: "Writes every pinboard, its folder and its clips, images included, to one file.") {
                     Button("Export…") { exportPinboards() }.controlSize(.small)
                 }
-                SettingsRow(title: "Import pinboards", detail: "Boards with the same name are merged; duplicates are skipped.") {
+                SettingsRow(title: "Import pinboards", detail: "Your pinboards stay; boards with the same name are merged, duplicates skipped.") {
                     Button("Import…") { importPinboards() }.controlSize(.small)
                 }
                 do {

@@ -118,6 +118,15 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 if CommandLine.arguments.contains("--demo-filter") {
                     self.store.filter = ClipFilter(kinds: [.text, .link], dateRange: .today)
                 }
+                // --demo-snapshot=PATH writes the bar to a PNG and quits, so
+                // the cards can be looked at without a screen recording.
+                if let arg = CommandLine.arguments.first(where: { $0.hasPrefix("--demo-snapshot=") }) {
+                    let path = String(arg.dropFirst("--demo-snapshot=".count))
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        self.barController?.writeSnapshot(to: URL(fileURLWithPath: path))
+                        NSApp.terminate(nil)
+                    }
+                }
             }
             return
         }

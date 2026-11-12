@@ -187,6 +187,14 @@ struct BarView: View {
                 Label("Clear History", systemImage: "trash")
             }
             Divider()
+            Button { PinboardTransfer.runFromBar(PinboardTransfer.export) } label: {
+                Label("Export Pinboards…", systemImage: "square.and.arrow.up")
+            }
+            .disabled(store.pinboards.isEmpty)
+            Button { PinboardTransfer.runFromBar(PinboardTransfer.importFile) } label: {
+                Label("Import Pinboards…", systemImage: "square.and.arrow.down")
+            }
+            Divider()
             Button { AppController.shared.showAbout() } label: {
                 Label("About Pastely", systemImage: "info.circle")
             }
@@ -230,11 +238,14 @@ struct BarView: View {
                     }
                 }
                 .padding(.horizontal, Theme.cardStripHorizontalPadding)
-                .padding(.top, 16)
-                .padding(.bottom, 26)
+                .padding(.top, Theme.cardStripTopPadding)
+                .padding(.bottom, Theme.cardStripBottomPadding)
                 .animation(.spring(response: 0.34, dampingFraction: 0.8), value: store.visibleItems.count)
                 .id(Self.stripStartID)
             }
+            // The selected card's glow reaches past the strip; the bar's
+            // own rounded shape is the only clip it needs.
+            .scrollClipDisabled()
             .onChange(of: store.barPresentationToken) { _, _ in
                 var transaction = Transaction()
                 transaction.disablesAnimations = true
