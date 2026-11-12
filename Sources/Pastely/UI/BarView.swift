@@ -11,6 +11,12 @@ struct BarView: View {
         store.barInputMode == .search || !store.searchText.isEmpty || store.filter.isActive
     }
 
+    /// Filters get a row of their own whenever they matter: while searching,
+    /// while one is on, or once the Filter button opened it.
+    private var showsFilterBar: Bool {
+        searchIsActive || store.showsFilterBar
+    }
+
     private var searchTextBinding: Binding<String> {
         Binding(
             get: { store.searchText },
@@ -25,6 +31,10 @@ struct BarView: View {
         .overlay(alignment: .top) {
             VStack(spacing: 0) {
                 topBar
+                if showsFilterBar {
+                    FilterBar()
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
                 if let group = store.group(for: store.source) {
                     PinboardGroupRow(group: group)
                         .transition(.opacity)
@@ -32,6 +42,7 @@ struct BarView: View {
                 strip
             }
             .animation(.easeOut(duration: 0.15), value: store.group(for: store.source)?.id)
+            .animation(.easeOut(duration: 0.18), value: showsFilterBar)
         }
         .overlay(alignment: topDocked ? .bottom : .top) {
             if settings.showBarResizeHandle {
@@ -70,6 +81,7 @@ struct BarView: View {
             if settings.iCloudSync { syncButton }
             #endif
             searchIndicator
+            FilterButton(shown: showsFilterBar)
             PinboardTabs()
                 .layoutPriority(1)
             Spacer(minLength: 8)
@@ -132,7 +144,6 @@ struct BarView: View {
             .accessibilityHidden(!searchIsActive)
 
             if searchIsActive {
-                FilterChips()
                 Button {
                     AppController.shared.clearBarSearch()
                 } label: {

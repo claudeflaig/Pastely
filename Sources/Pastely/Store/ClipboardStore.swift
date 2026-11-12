@@ -49,6 +49,8 @@ final class ClipboardStore {
         didSet { if filter != oldValue { selectFirst() } }
     }
     var barInputMode: BarInputMode = .cards
+    /// The filter row was opened with the Filter button.
+    var showsFilterBar = false
     var searchText: String = "" {
         didSet { if searchText != oldValue { clearMultiSelection() } }
     }

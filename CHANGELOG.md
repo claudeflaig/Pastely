@@ -19,11 +19,15 @@ All notable changes to Pesty are documented here. The format is based on
   Existing pinboards are kept, boards of the same name are merged, and
   importing the same file again adds nothing.
 
-- Card styles in Settings → Appearance: Classic, Glass (see-through cards lit
-  from the corner by the source app's color) and Paper (warm paper with a
-  colored spine, small caps and a serif face for text).
+- Card styles in Settings → Appearance: Glass (see-through cards lit from the
+  corner by the source app's color, the new default), Classic and Paper (warm
+  paper with a colored spine, small caps and a serif face for text).
+- Filters in plain sight: a Filter button next to search opens a row with
+  every clip type as a chip, menus for the app and the date, the number of
+  matching clips and Clear. The row also shows while searching or filtering.
 
 ### Changed
+- Less space above the cards.
 - Calmer, more refined cards: softer header gradients with a hairline and a
   glassy top edge, layered shadows, a hovered card lifts, and the selected
   card gets a focus ring standing off the card with a soft glow.

@@ -450,6 +450,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         barController?.resignSearch()
         store.searchText = ""
         store.filter = ClipFilter()
+        store.showsFilterBar = false
         store.barInputMode = .cards
         if hadQuery { store.selectFirst(); searchClearedAt = Date() }
     }
