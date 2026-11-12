@@ -48,9 +48,29 @@ final class ClipboardStore {
     var filter = ClipFilter() {
         didSet { if filter != oldValue { selectFirst() } }
     }
-    var barInputMode: BarInputMode = .cards
-    /// The filter row was opened with the Filter button.
+    var barInputMode: BarInputMode = .cards {
+        // Searching brings the filters along, unless they were put away
+        // during this search.
+        didSet {
+            if barInputMode == .search, oldValue != .search, !filterBarDismissed { showsFilterBar = true }
+        }
+    }
+    /// Whether the filter row shows. Only the Filter button hides it again,
+    /// until the search is cleared.
     var showsFilterBar = false
+    private(set) var filterBarDismissed = false
+
+    func toggleFilterBar() {
+        showsFilterBar.toggle()
+        filterBarDismissed = !showsFilterBar
+    }
+
+    /// Clearing the search puts the filter row away and forgets that it was
+    /// dismissed, so the next search shows it again.
+    func resetFilterBar() {
+        showsFilterBar = false
+        filterBarDismissed = false
+    }
     var searchText: String = "" {
         didSet { if searchText != oldValue { clearMultiSelection() } }
     }
