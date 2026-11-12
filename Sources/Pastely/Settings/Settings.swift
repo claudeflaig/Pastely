@@ -743,7 +743,7 @@ final class Settings {
             Keys.iCloudSync: false,
             Keys.cloudKitSync: true,
             Keys.clipColorTheme: ClipColorTheme.appIcon.rawValue,
-            Keys.cardTheme: CardTheme.classic.rawValue,
+            Keys.cardTheme: CardTheme.glass.rawValue,
             Keys.clipColorAccentHex: "#FF5A9F",
             Keys.selectedClipPosition: SelectedClipPosition.center.rawValue,
             Keys.barAppearance: BarAppearance.system.rawValue,
@@ -802,7 +802,7 @@ final class Settings {
         iCloudSync = d.bool(forKey: Keys.iCloudSync)
         cloudKitSync = d.bool(forKey: Keys.cloudKitSync)
         clipColorTheme = ClipColorTheme(rawValue: d.integer(forKey: Keys.clipColorTheme)) ?? .default
-        cardTheme = CardTheme(rawValue: d.integer(forKey: Keys.cardTheme)) ?? .classic
+        cardTheme = CardTheme(rawValue: d.integer(forKey: Keys.cardTheme)) ?? .glass
         clipColorAccentHex = d.string(forKey: Keys.clipColorAccentHex) ?? "#FF5A9F"
         selectedClipPosition = SelectedClipPosition(rawValue: d.integer(forKey: Keys.selectedClipPosition)) ?? .center
         barAppearance = BarAppearance(rawValue: d.integer(forKey: Keys.barAppearance)) ?? .system

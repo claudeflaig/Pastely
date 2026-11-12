@@ -54,9 +54,9 @@ enum Theme {
     // Leave 43 pt beyond the selected-card ring at either strip edge while
     // preserving the ScrollView's normal clipping behavior.
     static let cardStripHorizontalPadding: CGFloat = selectedCardRing + selectionRingGap + 43
-    /// The strip clips its content, so it leaves room above and below the
-    /// cards for the whole selection glow and a hovered card's lift.
-    static let cardStripTopPadding: CGFloat = selectionOutset + cardHoverLift + 4
+    /// The strip does not clip, so the glow may spill into the tabs above;
+    /// the padding only keeps the ring and a hovered card clear of them.
+    static let cardStripTopPadding: CGFloat = selectedCardRing + selectionRingGap + cardHoverLift + 4
     static let cardStripBottomPadding: CGFloat = max(26, selectionOutset + 8)
 
     static let chromeTextPrimary = graphite(0.88)
